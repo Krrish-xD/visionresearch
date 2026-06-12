@@ -10,7 +10,7 @@ import logging
 import time
 from dataclasses import dataclass, field
 
-from backend.core.base import BaseAnalyzer
+from core.base import BaseAnalyzer
 
 logger = logging.getLogger(__name__)
 

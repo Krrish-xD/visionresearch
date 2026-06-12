@@ -15,8 +15,8 @@ from typing import Any, AsyncIterator
 
 from PIL import Image
 
-from backend.core.base import BaseAnalyzer
-from backend.core.events import (
+from core.base import BaseAnalyzer
+from core.events import (
     SSEEvent,
     module_complete_event,
     module_error_event,
@@ -25,8 +25,8 @@ from backend.core.events import (
     pipeline_error_event,
     pipeline_start_event,
 )
-from backend.core.model_manager import ModelManager
-from backend.core.schemas import AnalysisResult, ModuleResult
+from core.model_manager import ModelManager
+from core.schemas import AnalysisResult, ModuleResult
 
 logger = logging.getLogger(__name__)
 
@@ -142,11 +142,20 @@ class PipelineOrchestrator:
             # Run modules in this stage (parallel for CPU modules, sequential otherwise)
             if stage_num == 0:
                 # CPU modules can run in parallel
+                for module in stage_modules:
+                    yield module_start_event(module.name, module.display_name, stage_num)
                 results = await self._run_parallel(
                     stage_modules, image, confidence_threshold
                 )
             else:
                 # GPU modules run sequentially to avoid memory contention
+                # Yield start event right before _run_sequential starts each module?
+                # For sequential, we can just yield them all as "running" for the stage,
+                # or better yet, we should probably yield them individually in _run_sequential.
+                # Since we can't easily yield from _run_sequential without changing it to an async generator,
+                # we'll just mark them all as running when the stage begins.
+                for module in stage_modules:
+                    yield module_start_event(module.name, module.display_name, stage_num)
                 results = await self._run_sequential(
                     stage_modules, image, confidence_threshold
                 )

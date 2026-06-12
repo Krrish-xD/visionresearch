@@ -1,19 +1,23 @@
 """FastAPI app initialization and middleware setup."""
 
+import os
+import warnings
 from contextlib import asynccontextmanager
+
+warnings.filterwarnings("ignore", category=FutureWarning)
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.api.routes import router
-from backend.config import settings
-from backend.core.model_manager import ModelManager
-from backend.core.pipeline import ModuleRegistry, PipelineOrchestrator
-from backend.modules.metadata import MetadataAnalyzer
-from backend.modules.colors import ColorPaletteAnalyzer
-from backend.modules.objects import ObjectDetector
-from backend.modules.caption import SceneCaptioner
-from backend.modules.nsfw import NSFWDetector
+from api.routes import router
+from config import settings
+from core.model_manager import ModelManager
+from core.pipeline import ModuleRegistry, PipelineOrchestrator
+from modules.metadata import MetadataAnalyzer
+from modules.colors import ColorPaletteAnalyzer
+from modules.objects import ObjectDetector
+from modules.caption import SceneCaptioner
+from modules.nsfw import NSFWDetector
 
 
 @asynccontextmanager

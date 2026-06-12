@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useSSE } from './useSSE';
 import { AnalysisResult, ModuleState } from '../types/analysis';
 
@@ -11,19 +11,11 @@ export function useAnalysis() {
   const [uploadedImageFile, setUploadedImageFile] = useState<File | null>(null);
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
   
-  // Track individual module states
-  const [moduleStates, setModuleStates] = useState<Record<string, ModuleState>>({});
-  
-  // The final aggregated result
-  const [analysisResult, setAnalysisResult] = useState<Partial<AnalysisResult>>({});
-
   const reset = useCallback(() => {
     disconnect();
     setIsAnalyzing(false);
     setUploadError(null);
     setTaskId(null);
-    setModuleStates({});
-    setAnalysisResult({});
     if (uploadedImageUrl) {
       URL.revokeObjectURL(uploadedImageUrl);
     }
@@ -61,60 +53,63 @@ export function useAnalysis() {
       setIsAnalyzing(false);
     }
   }, [connect, reset]);
-
-  // Process incoming SSE events
-  useEffect(() => {
-    if (!lastEvent) return;
-
-    if (lastEvent.module === 'pipeline_start' || lastEvent.module === 'pipeline_error' || lastEvent.module === 'pipeline_complete') {
-      // Handle pipeline level events
-      if (lastEvent.module === 'pipeline_complete') {
-        setIsAnalyzing(false);
-        if (lastEvent.results) {
-           setAnalysisResult(lastEvent.results);
-        }
-      } else if (lastEvent.module === 'pipeline_error') {
-        setIsAnalyzing(false);
-        setUploadError(lastEvent.error || 'Pipeline error');
-      } else if (lastEvent.module === 'pipeline_start') {
-         // Initialize modules based on the start event
-         if (lastEvent.results?.modules) {
-           const initialStates: Record<string, ModuleState> = {};
-           lastEvent.results.modules.forEach((mod: string) => {
-             initialStates[mod] = { name: mod, display_name: mod, status: 'pending' };
-           });
-           setModuleStates(initialStates);
-         }
-      }
-      return;
-    }
-
-    // Handle module level events
-    setModuleStates(prev => {
-      const existing = prev[lastEvent.module] || { name: lastEvent.module, display_name: lastEvent.display_name || lastEvent.module, status: 'pending' };
-      
-      return {
-        ...prev,
-        [lastEvent.module]: {
+  
+  // Derived state from events array guarantees we don't miss any events due to React batching
+  const moduleStates = useMemo(() => {
+    if (!taskId) return {};
+    const states: Record<string, ModuleState> = {};
+    events.forEach((evt) => {
+      if (evt.module === 'pipeline_start' && evt.results?.modules) {
+        evt.results.modules.forEach((mod: string) => {
+          states[mod] = { name: mod, display_name: mod, status: 'pending' };
+        });
+      } else if (
+        evt.module !== 'pipeline_start' &&
+        evt.module !== 'pipeline_complete' &&
+        evt.module !== 'pipeline_error'
+      ) {
+        const existing = states[evt.module] || {
+          name: evt.module,
+          display_name: evt.display_name || evt.module,
+          status: 'pending',
+        };
+        states[evt.module] = {
           ...existing,
-          display_name: lastEvent.display_name || existing.display_name,
-          status: lastEvent.status,
-          results: lastEvent.results || existing.results,
-          timing_ms: lastEvent.timing_ms || existing.timing_ms,
-          error: lastEvent.error || existing.error
-        }
-      };
+          display_name: evt.display_name || existing.display_name,
+          status: evt.status,
+          results: evt.results || existing.results,
+          timing_ms: evt.timing_ms || existing.timing_ms,
+          error: evt.error || existing.error,
+        };
+      }
     });
+    return states;
+  }, [events, taskId]);
 
-    // Progressively merge results into analysisResult
-    if (lastEvent.status === 'complete' && lastEvent.results) {
-      setAnalysisResult(prev => ({
-        ...prev,
-        ...lastEvent.results
-      }));
+  const analysisResult = useMemo(() => {
+    if (!taskId) return {};
+    let result: Partial<AnalysisResult> = {};
+    events.forEach((evt) => {
+      if (evt.module === 'pipeline_complete' && evt.results) {
+        result = evt.results;
+      } else if (evt.status === 'complete' && evt.results) {
+        result = { ...result, ...evt.results };
+      }
+    });
+    return result;
+  }, [events, taskId]);
+
+  // Handle stream termination
+  useEffect(() => {
+    if (events.length === 0) return;
+    const latest = events[events.length - 1];
+    if (latest.module === 'pipeline_complete') {
+      setIsAnalyzing(false);
+    } else if (latest.module === 'pipeline_error') {
+      setIsAnalyzing(false);
+      setUploadError(latest.error || 'Pipeline error');
     }
-
-  }, [lastEvent]);
+  }, [events]);
 
   // Progress calculation
   const totalModules = Object.keys(moduleStates).length;

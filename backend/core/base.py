@@ -12,7 +12,7 @@ from typing import Any
 
 from PIL import Image
 
-from backend.core.schemas import ModuleResult
+from core.schemas import ModuleResult
 
 
 class BaseAnalyzer(ABC):

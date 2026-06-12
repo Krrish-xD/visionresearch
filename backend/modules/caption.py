@@ -6,7 +6,7 @@ from typing import Any
 from PIL import Image
 import torch
 
-from backend.core.base import BaseAnalyzer
+from core.base import BaseAnalyzer
 
 
 class SceneCaptioner(BaseAnalyzer):
@@ -21,7 +21,7 @@ class SceneCaptioner(BaseAnalyzer):
     requires_gpu = True
     stage = 3
 
-    def __init__(self, model_id: str = "microsoft/Florence-2-large"):
+    def __init__(self, model_id: str = "microsoft/Florence-2-base"):
         super().__init__()
         self.model_id = model_id
         self.model = None
@@ -31,6 +31,11 @@ class SceneCaptioner(BaseAnalyzer):
 
     async def load_model(self, device: str = "cpu") -> None:
         from transformers import AutoProcessor, AutoModelForCausalLM
+        import transformers.dynamic_module_utils as dynamic_utils
+        
+        # Bypass strict flash_attn check in Florence-2 remote code
+        if hasattr(dynamic_utils, "check_imports"):
+            dynamic_utils.check_imports = lambda filename: []
         
         self.device = "cuda" if device.startswith("cuda") else "cpu"
         
@@ -38,6 +43,11 @@ class SceneCaptioner(BaseAnalyzer):
             self.processor = AutoProcessor.from_pretrained(
                 self.model_id, trust_remote_code=True
             )
+            # Fallback if tokenizer failed to load implicitly
+            if not getattr(self.processor, "tokenizer", None):
+                from transformers import AutoTokenizer
+                self.processor.tokenizer = AutoTokenizer.from_pretrained(self.model_id, trust_remote_code=True)
+            
             self.model = AutoModelForCausalLM.from_pretrained(
                 self.model_id, torch_dtype=self.dtype, trust_remote_code=True
             ).to(self.device)
@@ -64,7 +74,7 @@ class SceneCaptioner(BaseAnalyzer):
                 do_sample=False,
                 num_beams=3,
             )
-            caption = self.processor.batch_decode(
+            caption = self.processor.tokenizer.batch_decode(
                 generated_ids_brief, skip_special_tokens=False
             )[0]
             
@@ -82,7 +92,7 @@ class SceneCaptioner(BaseAnalyzer):
                 do_sample=False,
                 num_beams=3,
             )
-            detailed = self.processor.batch_decode(
+            detailed = self.processor.tokenizer.batch_decode(
                 generated_ids_det, skip_special_tokens=False
             )[0]
             

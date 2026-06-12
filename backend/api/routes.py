@@ -2,6 +2,7 @@
 
 import io
 import uuid
+import json
 import logging
 from pathlib import Path
 
@@ -9,8 +10,8 @@ from fastapi import APIRouter, File, Request, UploadFile, BackgroundTasks
 from sse_starlette.sse import EventSourceResponse
 from PIL import Image
 
-from backend.config import settings
-from backend.core.pipeline import PipelineOrchestrator
+from config import settings
+from core.pipeline import PipelineOrchestrator
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -79,15 +80,20 @@ async def stream_analysis(task_id: str, request: Request):
                     break
                 
                 # yield the event dict, sse-starlette handles conversion to 'data: ...'
-                yield event.to_dict()
+                # sse-starlette expects the payload string inside the 'data' key
+                yield {
+                    "data": json.dumps(event.to_dict())
+                }
                 
         except Exception as e:
             logger.exception(f"Error in pipeline execution for task {task_id}")
             yield {
-                "event": "pipeline_error",
-                "module": "pipeline",
-                "task_id": task_id,
-                "error": str(e)
+                "data": json.dumps({
+                    "event": "pipeline_error",
+                    "module": "pipeline",
+                    "task_id": task_id,
+                    "error": str(e)
+                })
             }
         finally:
             # Cleanup
