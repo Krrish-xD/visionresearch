@@ -7,8 +7,8 @@ from PIL import Image
 import torch
 import torch.nn.functional as F
 
-from backend.core.base import BaseAnalyzer
-from backend.core.schemas import NSFWResult
+from core.base import BaseAnalyzer
+from core.schemas import NSFWResult
 
 
 class NSFWDetector(BaseAnalyzer):

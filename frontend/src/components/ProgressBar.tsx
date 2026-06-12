@@ -13,7 +13,7 @@ export function ProgressBar({ progress, isAnalyzing, moduleStates, error }: Prog
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: ReturnType<typeof setTimeout>;
     if (isAnalyzing) {
       setElapsed(0);
       interval = setInterval(() => {

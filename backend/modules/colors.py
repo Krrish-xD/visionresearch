@@ -8,8 +8,8 @@ from PIL import Image
 from sklearn.cluster import KMeans
 import webcolors
 
-from backend.core.base import BaseAnalyzer
-from backend.core.schemas import ColorInfo
+from core.base import BaseAnalyzer
+from core.schemas import ColorInfo
 
 
 class ColorPaletteAnalyzer(BaseAnalyzer):
@@ -37,7 +37,12 @@ class ColorPaletteAnalyzer(BaseAnalyzer):
         except ValueError:
             # If no exact match, find nearest
             min_colors = {}
-            for name, hex_val in webcolors.CSS3_HEX_TO_NAMES.items():
+            try:
+                hex_names = webcolors.CSS3_HEX_TO_NAMES
+            except AttributeError:
+                hex_names = webcolors._definitions._CSS3_HEX_TO_NAMES
+            
+            for hex_val, name in hex_names.items():
                 r_c, g_c, b_c = webcolors.hex_to_rgb(hex_val)
                 rd = (r_c - rgb[0]) ** 2
                 gd = (g_c - rgb[1]) ** 2

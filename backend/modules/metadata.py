@@ -5,8 +5,8 @@ from typing import Any
 
 from PIL import Image, ExifTags
 
-from backend.core.base import BaseAnalyzer
-from backend.core.schemas import ImageMetadata
+from core.base import BaseAnalyzer
+from core.schemas import ImageMetadata
 
 
 class MetadataAnalyzer(BaseAnalyzer):

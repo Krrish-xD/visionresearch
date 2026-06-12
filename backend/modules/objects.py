@@ -6,8 +6,8 @@ from typing import Any
 from PIL import Image
 import torch
 
-from backend.core.base import BaseAnalyzer
-from backend.core.schemas import BoundingBox, DetectedObject
+from core.base import BaseAnalyzer
+from core.schemas import BoundingBox, DetectedObject
 
 
 class ObjectDetector(BaseAnalyzer):

@@ -48,10 +48,11 @@ class SSEEvent(BaseModel):
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to a plain dict for JSON serialization."""
+        dumped = self.model_dump(mode="json")
         return {
-            "event": self.event.value,
-            "module": self.module,
-            **self.data,
+            "event": dumped["event"],
+            "module": dumped["module"],
+            **dumped.get("data", {}),
         }
 
 
@@ -68,7 +69,7 @@ def pipeline_start_event(
         event=EventType.PIPELINE_START,
         data={
             "task_id": task_id,
-            "modules": modules,
+            "results": {"modules": modules},
             "total_stages": total_stages,
         },
     )
