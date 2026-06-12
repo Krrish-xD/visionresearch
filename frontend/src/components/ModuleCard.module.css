@@ -1,0 +1,208 @@
+.card {
+  margin-bottom: var(--spacing-md);
+  overflow: hidden;
+  border-left-width: 4px;
+  border-left-style: solid;
+}
+
+/* Dynamic Left Borders based on module */
+.module_object_detection { border-left-color: var(--color-module-objects); }
+.module_caption { border-left-color: var(--color-module-caption); }
+.module_colors { border-left-color: var(--color-module-colors); }
+.module_metadata { border-left-color: var(--color-module-meta); }
+.module_nsfw { border-left-color: var(--color-module-nsfw); }
+.module_default { border-left-color: var(--color-border); }
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-md);
+  cursor: pointer;
+  user-select: none;
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.header:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  color: var(--color-text-secondary);
+}
+
+.title {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.timing {
+  font-size: 0.75rem;
+  font-family: monospace;
+  opacity: 0.7;
+}
+
+.statusSuccess { color: var(--color-module-depth); } /* Emerald */
+.statusRunning { color: var(--color-accent-primary); }
+.statusError { color: var(--color-module-nsfw); } /* Red */
+.statusPending { color: var(--color-text-muted); }
+
+.body {
+  padding: var(--spacing-md);
+  border-top: 1px solid var(--glass-border);
+}
+
+.errorMessage {
+  color: var(--color-module-nsfw);
+  font-size: 0.85rem;
+  background: rgba(239, 68, 68, 0.1);
+  padding: var(--spacing-sm);
+  border-radius: var(--radius-sm);
+}
+
+/* Specific Content Styles */
+
+/* List/Progress Bars (Objects) */
+.listContainer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.listItem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  transition: background 0.2s;
+}
+
+.listItem:hover {
+  background: var(--color-surface-hover);
+}
+
+.listItemHeader {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+}
+
+.objectLabel {
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.objectScore {
+  color: var(--color-text-secondary);
+  font-family: monospace;
+}
+
+.progressBarBg {
+  height: 6px;
+  background: var(--color-bg-deep);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progressBarFill {
+  height: 100%;
+  border-radius: 3px;
+}
+
+/* Captions */
+.captionContainer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.captionBrief {
+  font-weight: 500;
+  font-size: 0.95rem;
+}
+
+.captionDetailed {
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+}
+
+/* Colors */
+.colorGrid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.colorItem {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.colorSwatch {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+.colorDetails {
+  display: flex;
+  justify-content: space-between;
+  flex: 1;
+  font-size: 0.85rem;
+}
+
+.colorHex { font-family: monospace; }
+.colorPct { color: var(--color-text-secondary); }
+
+/* Metadata Table */
+.metaTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.metaTable td {
+  padding: 4px 0;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.metaTable td:first-child {
+  color: var(--color-text-secondary);
+  width: 40%;
+}
+
+/* NSFW Badge */
+.nsfwBadge {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.nsfwSafe { background: rgba(16, 185, 129, 0.15); color: #10B981; }
+.nsfwDanger { background: rgba(239, 68, 68, 0.15); color: #EF4444; }
+
+/* JSON Fallback */
+.jsonBlock {
+  font-family: monospace;
+  font-size: 0.75rem;
+  background: var(--color-bg-deep);
+  padding: var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  overflow-x: auto;
+  color: var(--color-text-secondary);
+}

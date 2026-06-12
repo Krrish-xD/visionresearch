@@ -1,0 +1,62 @@
+[project]
+name = "visionresearch"
+version = "0.1.0"
+description = "Maximum image intelligence extraction — extract as much information as possible from any image"
+readme = "README.md"
+authors = [
+    { name = "Krrish-xD", email = "krrishatdev@gmail.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    # Web framework
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "sse-starlette>=2.0.0",
+    "python-multipart>=0.0.9",
+    # Data validation
+    "pydantic>=2.9.0",
+    "pydantic-settings>=2.5.0",
+    # Image processing
+    "Pillow>=10.4.0",
+    "opencv-python-headless>=4.10.0",
+    # ML framework
+    "torch>=2.4.0",
+    "torchvision>=0.19.0",
+    # Analysis models
+    "ultralytics>=8.3.0",       # YOLOv8 object detection + pose
+    "transformers>=4.45.0",     # Florence-2, SigLIP, etc.
+    "timm>=1.0.0",              # Vision model backbones
+    # Utilities
+    "numpy>=1.26.0",
+    "scikit-learn>=1.5.0",      # k-means for color palette
+    "exifread>=3.0.0",          # EXIF metadata extraction
+    "webcolors>=24.8.0",        # Named color matching
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+    "ruff>=0.6.0",
+    "mypy>=1.11.0",
+    "httpx>=0.27.0",            # Test client for FastAPI
+]
+
+[build-system]
+requires = ["uv_build>=0.11.21,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
