@@ -49,6 +49,7 @@ export function useSSE(): UseSSEResult {
           // Map backend event structure to frontend ModuleEvent
           // Backend sends: { event: 'module_complete', module: 'yolo', display_name: '...', status: '...', results: {...} }
           const moduleEvent: ModuleEvent = {
+            event: data.event,
             module: data.module || data.event,
             status: mapBackendEventToStatus(data.event, data.status),
             results: data.results,

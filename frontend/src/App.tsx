@@ -34,6 +34,16 @@ function App() {
     alert("JSON copied to clipboard!");
   };
 
+  const handleExportJSON = () => {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(analysisResult, null, 2));
+    const downloadAnchorNode = document.createElement('a');
+    downloadAnchorNode.setAttribute("href", dataStr);
+    downloadAnchorNode.setAttribute("download", `vision_analysis_${analysisResult.image_id || 'result'}.json`);
+    document.body.appendChild(downloadAnchorNode);
+    downloadAnchorNode.click();
+    downloadAnchorNode.remove();
+  };
+
   return (
     <div className={styles.appContainer}>
       {/* Header */}
@@ -47,7 +57,7 @@ function App() {
           <button className={styles.actionBtn} onClick={handleCopyJSON} disabled={!analysisResult.image_id}>
             <Copy size={18} /> <span className={styles.btnText}>Copy JSON</span>
           </button>
-          <button className={styles.actionBtn} disabled={!analysisResult.image_id}>
+          <button className={styles.actionBtn} onClick={handleExportJSON} disabled={!analysisResult.image_id}>
             <Download size={18} /> <span className={styles.btnText}>Export</span>
           </button>
           <div className={styles.divider} />
@@ -80,6 +90,7 @@ function App() {
                   analysisResult={analysisResult} 
                   hoveredObjectId={hoveredObjectId}
                   activeOverlays={activeOverlays}
+                  onOverlayChange={(key, val) => setActiveOverlays(p => ({...p, [key]: val}))}
                 />
               </div>
               

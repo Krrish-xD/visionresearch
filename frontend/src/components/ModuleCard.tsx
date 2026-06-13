@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronUp, CheckCircle, Loader2, XCircle, Clock } from 'lucide-react';
+import { ChevronDown, ChevronUp, CheckCircle, Loader2, XCircle, Clock, Info } from 'lucide-react';
 import { ModuleState, DetectedObject, ColorInfo } from '../types/analysis';
 import styles from './ModuleCard.module.css';
 
@@ -116,6 +116,65 @@ export function ModuleCard({ state, icon, onHoverObject }: ModuleCardProps) {
           <div className={`${styles.nsfwBadge} ${isSafe ? styles.nsfwSafe : styles.nsfwDanger}`}>
             <span className={styles.nsfwLabel}>{isSafe ? 'Safe Content' : 'NSFW Warning'}</span>
             <span className={styles.nsfwConfidence}>{(nsfw.confidence * 100).toFixed(1)}%</span>
+          </div>
+        );
+
+      case 'ocr':
+        const textRegions = state.results.text_regions || [];
+        if (textRegions.length === 0) return <div className={styles.emptyText}>No text detected</div>;
+        return (
+          <div className={styles.textList}>
+            {textRegions.map((tr: any, i: number) => (
+              <div key={i} className={styles.textItem}>
+                <span className={styles.textContent}>"{tr.content}"</span>
+                <span className={styles.textConf}>{(tr.confidence * 100).toFixed(0)}%</span>
+              </div>
+            ))}
+          </div>
+        );
+
+      case 'faces':
+        const faces = state.results.faces || [];
+        if (faces.length === 0) return <div className={styles.emptyText}>No faces detected</div>;
+        return (
+          <div className={styles.faceList}>
+            {faces.map((f: any, i: number) => (
+              <div key={i} className={styles.faceItem}>
+                <div className={styles.faceHeader}>Face {i + 1}</div>
+                <div className={styles.faceDetails}>
+                  {f.age && <span>Age: {f.age}</span>}
+                  {f.gender && <span>Gender: {f.gender}</span>}
+                  {f.emotion && <span>Emotion: {f.emotion} ({(f.emotion_confidence * 100).toFixed(0)}%)</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+
+      case 'pose':
+        const poses = state.results.poses || [];
+        if (poses.length === 0) return <div className={styles.emptyText}>No people detected</div>;
+        return <div className={styles.simpleText}>{poses.length} person(s) detected with pose estimation.</div>;
+
+      case 'depth':
+      case 'segmentation':
+        return <div className={styles.simpleText}>Map generated. Use the overlay toggle to view.</div>;
+
+      case 'siglip':
+        const tags = state.results.tags || [];
+        return (
+          <div className={styles.siglipContainer}>
+            <div className={styles.tagsContainer}>
+              {tags.length > 0 ? tags.map((t: string) => (
+                <span key={t} className={styles.tagBadge}>{t}</span>
+              )) : <span className={styles.emptyText}>No tags matched</span>}
+            </div>
+            {state.results.embedding && (
+              <div className={styles.embeddingInfo}>
+                <Info size={12} />
+                <span>Generated {state.results.embedding.length}-d embedding</span>
+              </div>
+            )}
           </div>
         );
 

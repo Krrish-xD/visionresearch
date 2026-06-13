@@ -58,15 +58,16 @@ export function useAnalysis() {
   const moduleStates = useMemo(() => {
     if (!taskId) return {};
     const states: Record<string, ModuleState> = {};
-    events.forEach((evt) => {
-      if (evt.module === 'pipeline_start' && evt.results?.modules) {
+    events.forEach((evt: any) => {
+      if (evt.event === 'pipeline_start' && evt.results?.modules) {
         evt.results.modules.forEach((mod: string) => {
           states[mod] = { name: mod, display_name: mod, status: 'pending' };
         });
       } else if (
-        evt.module !== 'pipeline_start' &&
-        evt.module !== 'pipeline_complete' &&
-        evt.module !== 'pipeline_error'
+        evt.event !== 'pipeline_start' &&
+        evt.event !== 'pipeline_complete' &&
+        evt.event !== 'pipeline_error' &&
+        evt.module && evt.module !== 'pipeline'
       ) {
         const existing = states[evt.module] || {
           name: evt.module,
@@ -89,10 +90,10 @@ export function useAnalysis() {
   const analysisResult = useMemo(() => {
     if (!taskId) return {};
     let result: Partial<AnalysisResult> = {};
-    events.forEach((evt) => {
-      if (evt.module === 'pipeline_complete' && evt.results) {
+    events.forEach((evt: any) => {
+      if (evt.event === 'pipeline_complete' && evt.results) {
         result = evt.results;
-      } else if (evt.status === 'complete' && evt.results) {
+      } else if (evt.status === 'complete' && evt.results && evt.event !== 'pipeline_complete') {
         result = { ...result, ...evt.results };
       }
     });
@@ -102,10 +103,10 @@ export function useAnalysis() {
   // Handle stream termination
   useEffect(() => {
     if (events.length === 0) return;
-    const latest = events[events.length - 1];
-    if (latest.module === 'pipeline_complete') {
+    const latest: any = events[events.length - 1];
+    if (latest.event === 'pipeline_complete') {
       setIsAnalyzing(false);
-    } else if (latest.module === 'pipeline_error') {
+    } else if (latest.event === 'pipeline_error') {
       setIsAnalyzing(false);
       setUploadError(latest.error || 'Pipeline error');
     }

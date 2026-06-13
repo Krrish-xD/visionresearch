@@ -26,8 +26,14 @@ class Settings(BaseSettings):
         "metadata",
         "colors",
         "object_detection",
-        "caption",
+        "pose",
         "nsfw",
+        "ocr",
+        "siglip",
+        "caption",
+        "faces",
+        "depth",
+        "segmentation",
     ]
 
     # Analysis defaults

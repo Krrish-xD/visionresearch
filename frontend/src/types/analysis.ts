@@ -91,6 +91,7 @@ export interface AnalysisResult {
 export type ModuleStatus = 'pending' | 'running' | 'complete' | 'error';
 
 export interface ModuleEvent {
+  event?: string;
   module: string;
   status: ModuleStatus;
   results?: any;

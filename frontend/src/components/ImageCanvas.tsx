@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { Stage, Layer, Image as KonvaImage, Rect, Text, Group } from 'react-konva';
+import { Stage, Layer, Image as KonvaImage, Rect, Text, Group, Circle, Line } from 'react-konva';
 import { AnalysisResult, DetectedObject, BoundingBox } from '../types/analysis';
+import { OverlayControls } from './OverlayControls';
 import styles from './ImageCanvas.module.css';
 
 interface ImageCanvasProps {
@@ -8,12 +9,15 @@ interface ImageCanvasProps {
   analysisResult: Partial<AnalysisResult>;
   hoveredObjectId?: string | null;
   activeOverlays: Record<string, boolean>;
+  onOverlayChange: (key: string, value: boolean) => void;
 }
 
-export function ImageCanvas({ imageUrl, analysisResult, hoveredObjectId, activeOverlays }: ImageCanvasProps) {
+export function ImageCanvas({ imageUrl, analysisResult, hoveredObjectId, activeOverlays, onOverlayChange }: ImageCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [image, setImage] = useState<HTMLImageElement | null>(null);
+  const [depthImage, setDepthImage] = useState<HTMLImageElement | null>(null);
+  const [segImage, setSegImage] = useState<HTMLImageElement | null>(null);
   
   // Viewport scaling and panning state
   const [scale, setScale] = useState(1);
@@ -40,6 +44,24 @@ export function ImageCanvas({ imageUrl, analysisResult, hoveredObjectId, activeO
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, [image]);
+
+  // Load overlay images
+  useEffect(() => {
+    if (analysisResult.depth_map_path) {
+      const img = new Image();
+      // Use absolute path pointing to backend API
+      img.src = `http://localhost:8000${analysisResult.depth_map_path}`;
+      img.onload = () => setDepthImage(img);
+    }
+  }, [analysisResult.depth_map_path]);
+
+  useEffect(() => {
+    if (analysisResult.segmentation_map_path) {
+      const img = new Image();
+      img.src = `http://localhost:8000${analysisResult.segmentation_map_path}`;
+      img.onload = () => setSegImage(img);
+    }
+  }, [analysisResult.segmentation_map_path]);
 
   const fitImageToContainer = (imgWidth: number, imgHeight: number) => {
     if (!containerRef.current) return;
@@ -161,6 +183,92 @@ export function ImageCanvas({ imageUrl, analysisResult, hoveredObjectId, activeO
     });
   };
 
+  const renderPoses = () => {
+    if (!activeOverlays.pose || !analysisResult.poses || !image) return null;
+
+    const POSE_CONNECTIONS = [
+      ['nose', 'left_eye'], ['left_eye', 'left_ear'],
+      ['nose', 'right_eye'], ['right_eye', 'right_ear'],
+      ['left_shoulder', 'right_shoulder'],
+      ['left_shoulder', 'left_elbow'], ['left_elbow', 'left_wrist'],
+      ['right_shoulder', 'right_elbow'], ['right_elbow', 'right_wrist'],
+      ['left_shoulder', 'left_hip'], ['right_shoulder', 'right_hip'],
+      ['left_hip', 'right_hip'],
+      ['left_hip', 'left_knee'], ['left_knee', 'left_ankle'],
+      ['right_hip', 'right_knee'], ['right_knee', 'right_ankle']
+    ];
+
+    return analysisResult.poses.map((pose, idx) => {
+      const kpDict: Record<string, any> = {};
+      pose.keypoints.forEach(kp => {
+        kpDict[kp.name] = { 
+          x: kp.x * image.width, 
+          y: kp.y * image.height,
+          conf: kp.confidence 
+        };
+      });
+
+      const color = '#10B981';
+
+      return (
+        <Group key={`pose-${idx}`}>
+          {POSE_CONNECTIONS.map(([kp1, kp2], cIdx) => {
+            const p1 = kpDict[kp1];
+            const p2 = kpDict[kp2];
+            if (p1 && p2 && p1.conf > 0.3 && p2.conf > 0.3) {
+              return (
+                <Line
+                  key={`line-${idx}-${cIdx}`}
+                  points={[p1.x, p1.y, p2.x, p2.y]}
+                  stroke={color}
+                  strokeWidth={3 / scale}
+                  opacity={0.8}
+                />
+              );
+            }
+            return null;
+          })}
+          
+          {pose.keypoints.filter(kp => kp.confidence > 0.3).map((kp, kpIdx) => (
+            <Circle
+              key={`kp-${idx}-${kpIdx}`}
+              x={kp.x * image.width}
+              y={kp.y * image.height}
+              radius={4 / scale}
+              fill="#ffffff"
+              stroke={color}
+              strokeWidth={2 / scale}
+            />
+          ))}
+        </Group>
+      );
+    });
+  };
+
+  const renderDepthMap = () => {
+    if (!activeOverlays.depth || !depthImage || !image) return null;
+    return (
+      <KonvaImage
+        image={depthImage}
+        width={image.width}
+        height={image.height}
+        opacity={0.8}
+      />
+    );
+  };
+
+  const renderSegmentation = () => {
+    if (!activeOverlays.segmentation || !segImage || !image) return null;
+    return (
+      <KonvaImage
+        image={segImage}
+        width={image.width}
+        height={image.height}
+        opacity={0.6}
+      />
+    );
+  };
+
   return (
     <div className={`glass-panel ${styles.canvasContainer}`} ref={containerRef}>
       {dimensions.width > 0 && image && (
@@ -182,16 +290,21 @@ export function ImageCanvas({ imageUrl, analysisResult, hoveredObjectId, activeO
           
           {/* Overlay Layer */}
           <Layer listening={false}>
+            {renderDepthMap()}
+            {renderSegmentation()}
             {renderBoundingBoxes()}
             {renderFaces()}
-            {/* Future: Depth Map, Segmentation Masks, Pose Skeletons */}
+            {renderPoses()}
           </Layer>
         </Stage>
       )}
       
       {/* Overlay toggle controls wrapper */}
       <div className={styles.controlsWrapper}>
-        {/* Render OverlayControls here via children/props in the future */}
+        <OverlayControls 
+          activeOverlays={activeOverlays} 
+          onChange={onOverlayChange} 
+        />
       </div>
     </div>
   );

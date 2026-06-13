@@ -54,6 +54,7 @@
 
 .moduleTracker {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--spacing-md);
   font-size: 0.8rem;
   color: var(--color-text-secondary);
