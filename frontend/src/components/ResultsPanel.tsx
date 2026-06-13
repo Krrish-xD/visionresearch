@@ -17,8 +17,8 @@ export function ResultsPanel({ moduleStates, onHoverObject }: ResultsPanelProps)
   // Group modules by category
   const groups = {
     visual: ['object_detection', 'faces', 'pose', 'depth', 'segmentation'],
-    text: ['caption', 'ocr', 'tags'],
-    meta: ['metadata', 'colors', 'nsfw', 'embedding', 'classification']
+    text: ['caption', 'ocr', 'siglip'],
+    meta: ['metadata', 'colors', 'nsfw']
   };
 
   const renderModuleCard = (name: string, icon: React.ReactNode) => {
@@ -68,7 +68,7 @@ export function ResultsPanel({ moduleStates, onHoverObject }: ResultsPanelProps)
           <div className="animate-fade-in">
             {renderModuleCard('caption', <Type size={18} />)}
             {renderModuleCard('ocr', <Type size={18} />)}
-            {renderModuleCard('tags', <Type size={18} />)}
+            {renderModuleCard('siglip', <Type size={18} />)}
           </div>
         )}
 
@@ -77,8 +77,6 @@ export function ResultsPanel({ moduleStates, onHoverObject }: ResultsPanelProps)
             {renderModuleCard('metadata', <Info size={18} />)}
             {renderModuleCard('colors', <Palette size={18} />)}
             {renderModuleCard('nsfw', <ShieldAlert size={18} />)}
-            {renderModuleCard('classification', <Info size={18} />)}
-            {renderModuleCard('embedding', <Info size={18} />)}
           </div>
         )}
       </div>

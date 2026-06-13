@@ -206,3 +206,106 @@
   overflow-x: auto;
   color: var(--color-text-secondary);
 }
+
+/* Text / OCR */
+.textList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.textItem {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+
+.textContent {
+  font-style: italic;
+  color: var(--color-text-primary);
+}
+
+.textConf {
+  color: var(--color-text-secondary);
+  font-family: monospace;
+}
+
+/* Faces */
+.faceList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.faceItem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+}
+
+.faceHeader {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--color-text-primary);
+}
+
+.faceDetails {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+}
+
+/* Tags / SigLIP */
+.siglipContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tagsContainer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tagBadge {
+  background: rgba(139, 92, 246, 0.15); /* Purple tint */
+  color: #c4b5fd;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  border: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+.embeddingInfo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  background: rgba(0, 0, 0, 0.2);
+  padding: 6px 8px;
+  border-radius: 4px;
+}
+
+/* Generic Empty/Simple Text */
+.emptyText {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  font-style: italic;
+  padding: 4px 0;
+}
+
+.simpleText {
+  color: var(--color-text-secondary);
+  font-size: 0.85rem;
+}

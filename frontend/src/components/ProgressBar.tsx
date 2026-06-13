@@ -61,20 +61,16 @@ export function ProgressBar({ progress, isAnalyzing, moduleStates, error }: Prog
       <div className={styles.barBackground}>
         <div 
           className={`${styles.barFill} ${isAnalyzing ? styles.barAnimated : ''} ${error ? styles.barError : ''}`}
-          style={{ width: `${Math.max(progress, 2)}%` }}
+          style={{ width: `${!isAnalyzing && !error && progress > 0 ? 100 : Math.max(progress, 2)}%` }}
         />
       </div>
 
       <div className={styles.moduleTracker}>
-        {coreModules.map(name => {
-          const state = moduleStates[name];
-          if (!state) return null;
-          return (
-            <span key={name} className={styles.trackerItem} title={state.display_name}>
-              {getStatusIcon(state.status)} <span className={styles.trackerName}>{state.display_name.split(' ')[0]}</span>
-            </span>
-          );
-        })}
+        {Object.values(moduleStates).map(state => (
+          <span key={state.name} className={styles.trackerItem} title={state.display_name}>
+            {getStatusIcon(state.status)} <span className={styles.trackerName}>{state.display_name.split(' ')[0]}</span>
+          </span>
+        ))}
       </div>
       
       {error && (

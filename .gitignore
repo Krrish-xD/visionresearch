@@ -59,6 +59,7 @@ coverage/
 
 # Application Specific (VisionResearch)
 backend/uploads/
+backend/outputs/
 backend/temp/
 *.pt
 *.pth
