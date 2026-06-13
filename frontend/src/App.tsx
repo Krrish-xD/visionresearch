@@ -1,52 +1,51 @@
 import { useState } from 'react';
-import { Microscope, Download, Copy, Settings } from 'lucide-react';
-import { useAnalysis } from './hooks/useAnalysis';
+import { Microscope, Download, Copy, Settings, History, MessageSquare } from 'lucide-react';
 import { ImageUpload } from './components/ImageUpload';
-import { ImageCanvas } from './components/ImageCanvas';
-import { ResultsPanel } from './components/ResultsPanel';
-import { ProgressBar } from './components/ProgressBar';
+import { TaskRunner } from './components/TaskRunner';
 import styles from './App.module.css';
 
+import { HistoryPanel } from './components/HistoryPanel';
+
+interface TaskSession {
+  id: string;
+  file?: File;
+  historyId?: string;
+}
+
 function App() {
-  const { 
-    uploadAndAnalyze, 
-    isAnalyzing, 
-    progress, 
-    error, 
-    moduleStates, 
-    analysisResult,
-    uploadedImageUrl 
-  } = useAnalysis();
+  const [sessions, setSessions] = useState<TaskSession[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
 
-  const [hoveredObjectId, setHoveredObjectId] = useState<string | null>(null);
-  
-  // Which overlays are visible on the canvas
-  const [activeOverlays, setActiveOverlays] = useState({
-    objects: true,
-    faces: true,
-    pose: true,
-    depth: false,
-    segmentation: false
-  });
-
-  const handleCopyJSON = () => {
-    navigator.clipboard.writeText(JSON.stringify(analysisResult, null, 2));
-    alert("JSON copied to clipboard!");
+  const handleUpload = (files: File[]) => {
+    const newSessions = files.map(f => ({
+      id: Math.random().toString(36).substring(7),
+      file: f
+    }));
+    setSessions(prev => [...prev, ...newSessions]);
+    if (!activeSessionId && newSessions.length > 0) {
+      setActiveSessionId(newSessions[0].id);
+    }
   };
 
-  const handleExportJSON = () => {
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(analysisResult, null, 2));
-    const downloadAnchorNode = document.createElement('a');
-    downloadAnchorNode.setAttribute("href", dataStr);
-    downloadAnchorNode.setAttribute("download", `vision_analysis_${analysisResult.image_id || 'result'}.json`);
-    document.body.appendChild(downloadAnchorNode);
-    downloadAnchorNode.click();
-    downloadAnchorNode.remove();
+  const handleSelectHistory = (id: string) => {
+    setShowHistory(false);
+    const existing = sessions.find(s => s.historyId === id);
+    if (existing) {
+      setActiveSessionId(existing.id);
+      return;
+    }
+    const newId = Math.random().toString(36).substring(7);
+    setSessions(prev => [...prev, { id: newId, historyId: id }]);
+    setActiveSessionId(newId);
+  };
+
+  const handleCopyJSON = () => {
+    alert("JSON copy will be implemented shortly.");
   };
 
   return (
     <div className={styles.appContainer}>
-      {/* Header */}
       <header className={`glass-panel ${styles.header}`}>
         <div className={styles.logo}>
           <Microscope size={28} className={styles.logoIcon} />
@@ -54,64 +53,55 @@ function App() {
         </div>
         
         <div className={styles.headerActions}>
-          <button className={styles.actionBtn} onClick={handleCopyJSON} disabled={!analysisResult.image_id}>
+          <button className={styles.actionBtn} onClick={handleCopyJSON} disabled={sessions.length === 0}>
             <Copy size={18} /> <span className={styles.btnText}>Copy JSON</span>
           </button>
-          <button className={styles.actionBtn} onClick={handleExportJSON} disabled={!analysisResult.image_id}>
-            <Download size={18} /> <span className={styles.btnText}>Export</span>
-          </button>
           <div className={styles.divider} />
+          <button className={styles.iconBtn} title="History" onClick={() => setShowHistory(true)}>
+            <History size={20} />
+          </button>
           <button className={styles.iconBtn} title="Settings">
             <Settings size={20} />
           </button>
         </div>
       </header>
 
-      {/* Main Content Area */}
+      {showHistory && (
+        <HistoryPanel 
+          onClose={() => setShowHistory(false)} 
+          onSelectHistory={handleSelectHistory} 
+        />
+      )}
+
       <main className={styles.main}>
-        {!uploadedImageUrl ? (
-          /* Initial State: Upload Zone centered */
+        {sessions.length === 0 ? (
           <div className={styles.uploadContainer}>
             <div className={styles.welcomeText}>
               <h2>Maximum Image Intelligence</h2>
-              <p>Upload an image to run a comprehensive analysis pipeline.</p>
+              <p>Upload images to run a comprehensive analysis pipeline.</p>
             </div>
-            <ImageUpload onUpload={uploadAndAnalyze} disabled={isAnalyzing} />
+            <ImageUpload onUpload={handleUpload} />
           </div>
         ) : (
-          /* Analysis State: Split View */
-          <div className={styles.splitView}>
-            
-            {/* Left Column: Canvas & Controls */}
-            <div className={styles.leftCol}>
-              <div className={styles.canvasWrapper}>
-                <ImageCanvas 
-                  imageUrl={uploadedImageUrl} 
-                  analysisResult={analysisResult} 
-                  hoveredObjectId={hoveredObjectId}
-                  activeOverlays={activeOverlays}
-                  onOverlayChange={(key, val) => setActiveOverlays(p => ({...p, [key]: val}))}
-                />
-              </div>
-              
-              <div className={styles.progressWrapper}>
-                <ProgressBar 
-                  progress={progress} 
-                  isAnalyzing={isAnalyzing} 
-                  moduleStates={moduleStates} 
-                  error={error} 
-                />
+          <div className={styles.workspace}>
+            <div className={styles.sidebar} id="sidebar-portal">
+              {/* TaskRunner components will portal their thumbnails here */}
+              <div className={styles.addMoreBtn}>
+                 <ImageUpload onUpload={handleUpload} />
               </div>
             </div>
             
-            {/* Right Column: Results Panel */}
-            <div className={styles.rightCol}>
-              <ResultsPanel 
-                moduleStates={moduleStates} 
-                onHoverObject={setHoveredObjectId}
-              />
+            <div className={styles.workspaceContent}>
+              {sessions.map(session => (
+                <TaskRunner 
+                  key={session.id} 
+                  file={session.file} 
+                  historyId={session.historyId}
+                  isActive={session.id === activeSessionId}
+                  onSelect={() => setActiveSessionId(session.id)}
+                />
+              ))}
             </div>
-            
           </div>
         )}
       </main>

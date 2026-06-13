@@ -112,6 +112,36 @@ class SceneCaptioner(BaseAnalyzer):
 
         return await asyncio.to_thread(_infer)
 
+    async def ask_question(self, image: Image.Image, question: str) -> str:
+        if not self.model or not self.processor:
+            raise RuntimeError("Model not loaded")
+            
+        def _qa():
+            prompt = f"<VQA> {question}"
+            inputs = self.processor(
+                text=prompt, images=image, return_tensors="pt"
+            ).to(self.device, self.dtype)
+            
+            generated_ids = self.model.generate(
+                input_ids=inputs["input_ids"],
+                pixel_values=inputs["pixel_values"],
+                max_new_tokens=1024,
+                early_stopping=False,
+                do_sample=False,
+                num_beams=3,
+            )
+            answer = self.processor.tokenizer.batch_decode(
+                generated_ids, skip_special_tokens=False
+            )[0]
+            
+            # Post-process Florence's special tokens using the full prompt as the task to strip it
+            parsed_answer = self.processor.post_process_generation(
+                answer, task=prompt, image_size=(image.width, image.height)
+            )
+            return parsed_answer.get(prompt, answer).strip()
+            
+        return await asyncio.to_thread(_qa)
+
     async def unload_model(self) -> None:
         if self.model:
             del self.model

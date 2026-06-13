@@ -3,7 +3,7 @@ import { useSSE } from './useSSE';
 import { AnalysisResult, ModuleState } from '../types/analysis';
 
 export function useAnalysis() {
-  const { events, isConnected, lastEvent, connect, disconnect, error: sseError } = useSSE();
+  const { events, isConnected, lastEvent, connect, disconnect, error: sseError, setEvents } = useSSE();
   
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -13,6 +13,7 @@ export function useAnalysis() {
   
   const reset = useCallback(() => {
     disconnect();
+    setEvents([]);
     setIsAnalyzing(false);
     setUploadError(null);
     setTaskId(null);
@@ -21,7 +22,37 @@ export function useAnalysis() {
     }
     setUploadedImageUrl(null);
     setUploadedImageFile(null);
-  }, [disconnect, uploadedImageUrl]);
+  }, [disconnect, uploadedImageUrl, setEvents]);
+
+  const loadHistory = useCallback(async (id: string) => {
+    reset();
+    setIsAnalyzing(true);
+    setTaskId(id);
+    
+    try {
+      const response = await fetch(`/api/history/${id}`);
+      if (!response.ok) throw new Error('Failed to load history');
+      const data = await response.json();
+      
+      const fakeEvents: any[] = [];
+      if (data.results) {
+         fakeEvents.push({ event: 'pipeline_complete', results: data.results });
+         Object.keys(data.results.module_timings || {}).forEach(mod => {
+            fakeEvents.push({ module: mod, status: 'complete', timing_ms: data.results.module_timings[mod] });
+         });
+      }
+      
+      const extMatch = data.filename.match(/\.[^.]+$/);
+      const ext = extMatch ? extMatch[0] : '.jpg';
+      setUploadedImageUrl(`/uploads/${id}${ext}`);
+      
+      setEvents(fakeEvents);
+    } catch(err: any) {
+      setUploadError(err.message);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  }, [reset, setEvents]);
 
   const uploadAndAnalyze = useCallback(async (file: File) => {
     reset();
@@ -119,6 +150,7 @@ export function useAnalysis() {
 
   return {
     uploadAndAnalyze,
+    loadHistory,
     isAnalyzing,
     progress: progressPercent,
     error: uploadError || sseError,

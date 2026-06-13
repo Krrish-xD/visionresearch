@@ -17,7 +17,8 @@ from contextlib import asynccontextmanager
 
 warnings.filterwarnings("ignore", category=FutureWarning)
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -43,6 +44,12 @@ async def lifespan(app: FastAPI):
     """Lifecycle manager for the FastAPI application."""
     # Ensure directories exist
     settings.ensure_dirs()
+    
+    from core.database import engine
+    from core.models import Base
+    
+    # Initialize Database
+    Base.metadata.create_all(bind=engine)
     
     # Initialize GPU Memory Manager
     device = settings.resolve_device()
@@ -105,3 +112,16 @@ app.include_router(router, prefix="/api")
 # Mount static files
 app.mount("/uploads", StaticFiles(directory=settings.upload_dir), name="uploads")
 app.mount("/outputs", StaticFiles(directory=settings.output_dir), name="outputs")
+
+# Mount frontend
+from pathlib import Path
+from fastapi.responses import FileResponse
+frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"
+if frontend_dist.exists():
+    app.mount("/", StaticFiles(directory=frontend_dist, html=True), name="frontend")
+    
+    @app.exception_handler(404)
+    async def fallback_to_index(request: Request, exc: Exception):
+        if request.url.path.startswith("/api"):
+            return JSONResponse({"detail": "Not Found"}, status_code=404)
+        return FileResponse(frontend_dist / "index.html")
