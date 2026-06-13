@@ -1,17 +1,19 @@
 import { useState } from 'react';
-import { Box, Type, Info, ShieldAlert, Palette, ScanFace, ScanLine } from 'lucide-react';
+import { ChatPanel } from './ChatPanel';
+import { Box, Type, Info, ShieldAlert, Palette, ScanFace, ScanLine, MessageSquare } from 'lucide-react';
 import { ModuleState } from '../types/analysis';
 import { ModuleCard } from './ModuleCard';
 import styles from './ResultsPanel.module.css';
 
 interface ResultsPanelProps {
+  taskId: string | null;
   moduleStates: Record<string, ModuleState>;
   onHoverObject?: (id: string | null) => void;
 }
 
-type TabType = 'visual' | 'text' | 'meta';
+type TabType = 'visual' | 'text' | 'meta' | 'chat';
 
-export function ResultsPanel({ moduleStates, onHoverObject }: ResultsPanelProps) {
+export function ResultsPanel({ taskId, moduleStates, onHoverObject }: ResultsPanelProps) {
   const [activeTab, setActiveTab] = useState<TabType>('visual');
 
   // Group modules by category
@@ -50,6 +52,12 @@ export function ResultsPanel({ moduleStates, onHoverObject }: ResultsPanelProps)
         >
           <Info size={16} /> Meta
         </button>
+        <button 
+          className={`${styles.tab} ${activeTab === 'chat' ? styles.activeTab : ''}`}
+          onClick={() => setActiveTab('chat')}
+        >
+          <MessageSquare size={16} /> Chat
+        </button>
       </div>
 
       {/* Scrollable Content Area */}
@@ -77,6 +85,12 @@ export function ResultsPanel({ moduleStates, onHoverObject }: ResultsPanelProps)
             {renderModuleCard('metadata', <Info size={18} />)}
             {renderModuleCard('colors', <Palette size={18} />)}
             {renderModuleCard('nsfw', <ShieldAlert size={18} />)}
+          </div>
+        )}
+
+        {activeTab === 'chat' && (
+          <div className="animate-fade-in" style={{ height: '100%' }}>
+            {taskId ? <ChatPanel taskId={taskId} /> : <div style={{padding: 20, color: '#888'}}>Waiting for task...</div>}
           </div>
         )}
       </div>

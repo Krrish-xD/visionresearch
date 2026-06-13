@@ -8,6 +8,7 @@ interface UseSSEResult {
   lastEvent: ModuleEvent | null;
   connect: (taskId: string) => void;
   disconnect: () => void;
+  setEvents: React.Dispatch<React.SetStateAction<ModuleEvent[]>>;
 }
 
 export function useSSE(): UseSSEResult {
@@ -88,7 +89,7 @@ export function useSSE(): UseSSEResult {
     };
   }, [disconnect]);
 
-  return { events, isConnected, error, lastEvent, connect, disconnect };
+  return { events, isConnected, error, lastEvent, connect, disconnect, setEvents };
 }
 
 // Helper to map backend event strings to our UI status enum

@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  visionresearch:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: visionresearch
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data/uploads:/app/backend/uploads
+      - ./data/outputs:/app/backend/outputs
+      - ./data/db:/app/backend/data
+      - ~/.cache/huggingface:/root/.cache/huggingface
+    environment:
+      - DATABASE_URL=sqlite:////app/backend/data/visionresearch.db
+      - MAX_IMAGE_DIMENSION=1024
+      - VRAM_BUDGET_MB=12000
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped

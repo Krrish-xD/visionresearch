@@ -4,14 +4,14 @@ import { Upload, Image as ImageIcon } from 'lucide-react';
 import styles from './ImageUpload.module.css';
 
 interface ImageUploadProps {
-  onUpload: (file: File) => void;
+  onUpload: (files: File[]) => void;
   disabled?: boolean;
 }
 
 export function ImageUpload({ onUpload, disabled = false }: ImageUploadProps) {
   const onDrop = useCallback((acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0 && !disabled) {
-      onUpload(acceptedFiles[0]);
+      onUpload(acceptedFiles);
     }
   }, [onUpload, disabled]);
 
@@ -20,7 +20,7 @@ export function ImageUpload({ onUpload, disabled = false }: ImageUploadProps) {
     accept: {
       'image/*': ['.jpeg', '.jpg', '.png', '.webp', '.gif']
     },
-    maxFiles: 1,
+    maxFiles: 10,
     disabled
   });
 
@@ -32,14 +32,15 @@ export function ImageUpload({ onUpload, disabled = false }: ImageUploadProps) {
       const items = e.clipboardData?.items;
       if (!items) return;
 
+      const pastedFiles: File[] = [];
       for (const item of items) {
         if (item.type.indexOf('image') !== -1) {
           const file = item.getAsFile();
-          if (file) {
-            onUpload(file);
-            break;
-          }
+          if (file) pastedFiles.push(file);
         }
+      }
+      if (pastedFiles.length > 0) {
+        onUpload(pastedFiles);
       }
     };
 
