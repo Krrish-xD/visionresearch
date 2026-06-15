@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     model_cache_dir: Path = Path("./models")
 
     # GPU / Memory
-    vram_budget_mb: int = 11_000  # 11GB usable on a 12GB card
+    vram_budget_mb: int = 0  # 0 = auto-detect at startup
     device: str = "auto"  # "auto", "cuda", "cpu"
 
     # Pipeline
@@ -38,7 +38,7 @@ class Settings(BaseSettings):
 
     # Analysis defaults
     confidence_threshold: float = 0.25
-    max_image_dimension: int = 4096  # Resize images larger than this
+    max_image_dimension: int = 1920  # Resize images larger than this (limits activation memory)
 
     # CORS
     cors_origins: list[str] = ["http://localhost:5173", "http://localhost:3000"]
@@ -51,12 +51,27 @@ class Settings(BaseSettings):
             return self.device
         try:
             import torch
-
             if torch.cuda.is_available():
                 return "cuda"
         except ImportError:
             pass
         return "cpu"
+
+    def resolve_vram_budget(self) -> int:
+        """Auto-detect usable VRAM, leaving 10% headroom for CUDA overhead."""
+        if self.vram_budget_mb > 0:
+            return self.vram_budget_mb
+        try:
+            import torch
+            if torch.cuda.is_available():
+                total_bytes = torch.cuda.get_device_properties(0).total_memory
+                total_mb = total_bytes // (1024 * 1024)
+                # Leave 10% headroom for CUDA context and driver
+                usable = int(total_mb * 0.88)
+                return usable
+        except Exception:
+            pass
+        return 4000  # Conservative fallback for CPU
 
     def ensure_dirs(self) -> None:
         """Create required directories."""

@@ -60,3 +60,10 @@ visionresearch/
 - Peak VRAM: ~2GB (Florence-2 stage)
 - `torch.cuda.empty_cache()` between stages
 - LRU eviction when VRAM budget exceeded
+
+## Running the Application
+To start both the frontend and backend in quiet mode (suppressing debug logs and terminal clutter) concurrently:
+```bash
+./start.sh
+```
+Press `Ctrl+C` in the terminal to cleanly shut down both processes.

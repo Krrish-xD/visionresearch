@@ -14,8 +14,8 @@ class OCRAnalyzer(BaseAnalyzer):
 
     name: str = "ocr"
     display_name: str = "Text Extraction (OCR)"
-    estimated_vram_mb: int = 500
-    requires_gpu: bool = True
+    estimated_vram_mb: int = 0   # CPU-only: no VRAM needed
+    requires_gpu: bool = False   # Run on CPU to avoid float16/float32 mismatch
     stage: int = 2
 
     def __init__(self, lang: str = "en"):
@@ -25,8 +25,10 @@ class OCRAnalyzer(BaseAnalyzer):
     async def load_model(self, device: str = "cpu") -> None:
         if self.model is None:
             import easyocr
-            # Initialize EasyOCR reader
-            self.model = easyocr.Reader([self.lang], gpu=device == "cuda")
+            # Force CPU — EasyOCR's GPU path mixes float16/float32 causing crashes.
+            # CPU path uses float32 throughout and is still fast enough for single images.
+            self.model = easyocr.Reader([self.lang], gpu=False)
+            self._is_loaded = True
 
     async def unload_model(self) -> None:
         if self.model is not None:

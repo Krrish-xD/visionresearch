@@ -13,9 +13,12 @@ os.environ["FLAGS_enable_pir_api"] = "0"
 os.environ["FLAGS_use_mkldnn"] = "0"
 
 import warnings
+import logging
 from contextlib import asynccontextmanager
 
 warnings.filterwarnings("ignore", category=FutureWarning)
+
+logger = logging.getLogger(__name__)
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -53,8 +56,10 @@ async def lifespan(app: FastAPI):
     
     # Initialize GPU Memory Manager
     device = settings.resolve_device()
+    vram_budget = settings.resolve_vram_budget()
+    logger.info(f"Device: {device} | VRAM budget: {vram_budget} MB")
     model_manager = ModelManager(
-        vram_budget_mb=settings.vram_budget_mb,
+        vram_budget_mb=vram_budget,
         device=device
     )
     
@@ -75,6 +80,25 @@ async def lifespan(app: FastAPI):
     registry.register(DepthAnalyzer())
     registry.register(SigLIPAnalyzer())
     registry.register(SegmentationAnalyzer())
+    
+    # Load Plugins
+    import importlib
+    import pkgutil
+    import inspect
+    from core.base import BaseAnalyzer
+    
+    plugins_dir = Path(__file__).parent / "plugins"
+    if plugins_dir.exists():
+        for _, module_name, _ in pkgutil.iter_modules([str(plugins_dir)]):
+            try:
+                module = importlib.import_module(f"plugins.{module_name}")
+                for name, obj in inspect.getmembers(module):
+                    if inspect.isclass(obj) and issubclass(obj, BaseAnalyzer) and obj != BaseAnalyzer:
+                        # Instantiate and register the plugin
+                        registry.register(obj())
+                        logger.info(f"Loaded plugin: {obj.__name__} from {module_name}")
+            except Exception as e:
+                logger.error(f"Failed to load plugin {module_name}: {e}")
     
     # Initialize Pipeline Orchestrator
     orchestrator = PipelineOrchestrator(registry, model_manager)
@@ -120,8 +144,11 @@ frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"
 if frontend_dist.exists():
     app.mount("/", StaticFiles(directory=frontend_dist, html=True), name="frontend")
     
+    from fastapi import HTTPException
+    
     @app.exception_handler(404)
     async def fallback_to_index(request: Request, exc: Exception):
         if request.url.path.startswith("/api"):
-            return JSONResponse({"detail": "Not Found"}, status_code=404)
+            detail = getattr(exc, "detail", "Not Found")
+            return JSONResponse({"detail": detail}, status_code=404)
         return FileResponse(frontend_dist / "index.html")

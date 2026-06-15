@@ -8,6 +8,7 @@ class AnalysisTask(Base):
     __tablename__ = "analysis_tasks"
 
     id = Column(String, primary_key=True, index=True) # task_id
+    parent_task_id = Column(String, index=True, nullable=True) # For video batches
     filename = Column(String, nullable=False)
     filepath = Column(String, nullable=False)
     status = Column(String, default="pending") # pending, complete, error
@@ -17,3 +18,6 @@ class AnalysisTask(Base):
     
     # Store the final aggregated structured output from AnalysisResult
     final_results = Column(JSON, nullable=True)
+    
+    # Persistent chat history: list of {role: "user"|"assistant", content: str}
+    chat_history = Column(JSON, nullable=True, default=list)

@@ -9,17 +9,20 @@ import styles from '../App.module.css';
 export function TaskRunner({ 
   file, 
   historyId,
+  existingTaskId,
   isActive, 
   onSelect 
 }: { 
   file?: File; 
   historyId?: string;
+  existingTaskId?: string;
   isActive: boolean; 
   onSelect: () => void;
 }) {
   const { 
     uploadAndAnalyze, 
     loadHistory,
+    connectToExisting,
     isAnalyzing, 
     progress, 
     error, 
@@ -42,6 +45,8 @@ export function TaskRunner({
   useEffect(() => {
     if (file) {
       uploadAndAnalyze(file);
+    } else if (existingTaskId) {
+      connectToExisting(existingTaskId);
     } else if (historyId) {
       loadHistory(historyId);
     }

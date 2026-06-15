@@ -38,8 +38,12 @@ class SigLIPAnalyzer(BaseAnalyzer):
             from transformers import AutoProcessor, AutoModel
             
             self.device = "cuda" if settings.resolve_device() == "cuda" else "cpu"
+            # Always use float32 for CPU; float16 only when CUDA available
+            dtype = torch.float16 if self.device == "cuda" else torch.float32
             self.processor = AutoProcessor.from_pretrained(self.model_id)
-            self.model = AutoModel.from_pretrained(self.model_id).to(self.device)
+            self.model = AutoModel.from_pretrained(self.model_id, torch_dtype=dtype).to(self.device)
+            self.model.eval()
+            self._dtype = dtype
 
     async def unload_model(self) -> None:
         if self.model is not None:
@@ -55,12 +59,18 @@ class SigLIPAnalyzer(BaseAnalyzer):
         start_time = time.time()
         
         # Prepare inputs for both text and image
+        dtype = getattr(self, "_dtype", torch.float32)
         inputs = self.processor(
             text=self.candidate_tags, 
             images=image.convert("RGB"), 
             padding="max_length", 
             return_tensors="pt"
-        ).to(self.device)
+        )
+        # Cast pixel_values to model dtype; keep input_ids as long
+        inputs = {
+            k: v.to(self.device, dtype) if v.dtype.is_floating_point else v.to(self.device)
+            for k, v in inputs.items()
+        }
         
         with torch.no_grad():
             outputs = self.model(**inputs)
