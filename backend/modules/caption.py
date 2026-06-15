@@ -117,7 +117,13 @@ class SceneCaptioner(BaseAnalyzer):
             raise RuntimeError("Model not loaded")
             
         def _qa():
-            prompt = f"<VQA> {question}"
+            import re
+            
+            # Florence-2 <VQA> is a visual grounding task — its output is messy.
+            # Wrapping the question as a detailed-caption prompt yields much cleaner text.
+            task = "<MORE_DETAILED_CAPTION>"
+            prompt = f"{task} {question}"
+            
             inputs = self.processor(
                 text=prompt, images=image, return_tensors="pt"
             ).to(self.device, self.dtype)
@@ -125,20 +131,35 @@ class SceneCaptioner(BaseAnalyzer):
             generated_ids = self.model.generate(
                 input_ids=inputs["input_ids"],
                 pixel_values=inputs["pixel_values"],
-                max_new_tokens=1024,
-                early_stopping=False,
+                max_new_tokens=200,
+                early_stopping=True,
                 do_sample=False,
                 num_beams=3,
             )
-            answer = self.processor.tokenizer.batch_decode(
-                generated_ids, skip_special_tokens=False
+            
+            # Decode with skip_special_tokens=True to strip <s>, </s>, <pad>
+            raw = self.processor.tokenizer.batch_decode(
+                generated_ids, skip_special_tokens=True
             )[0]
             
-            # Post-process Florence's special tokens using the full prompt as the task to strip it
-            parsed_answer = self.processor.post_process_generation(
-                answer, task=prompt, image_size=(image.width, image.height)
-            )
-            return parsed_answer.get(prompt, answer).strip()
+            answer = raw
+            
+            # Strip ALL Florence-2 task/location/region tokens:
+            # <VQA>, <CAPTION>, <loc_42>, <ref>, </ref>, etc.
+            answer = re.sub(r"</?[A-Z_]+>", "", answer)      # task tags
+            answer = re.sub(r"<loc_\d+>", "", answer)         # location tokens
+            answer = re.sub(r"<[^>]{0,40}>", "", answer)      # any remaining short tags
+            
+            # Strip echoed task prompt prefix (e.g. "MORE_DETAILED_CAPTION")
+            answer = re.sub(r"^[A-Z_]+\s*", "", answer)
+            
+            # Strip echoed question if the model repeated it at the start
+            q_lower = question.strip().lower()
+            a_lower = answer.strip().lower()
+            if a_lower.startswith(q_lower):
+                answer = answer[len(question):].strip(" .,")
+            
+            return answer.strip() or "I'm not sure — try asking a more specific question about the image."
             
         return await asyncio.to_thread(_qa)
 

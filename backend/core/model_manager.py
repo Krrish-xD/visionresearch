@@ -150,12 +150,14 @@ class ModelManager:
         self._clear_gpu_cache()
 
     def _clear_gpu_cache(self) -> None:
-        """Clear CUDA memory cache if available."""
+        """Clear CUDA memory cache and Python garbage collect."""
+        import gc
+        gc.collect()
         try:
             import torch
-
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
+                torch.cuda.synchronize()
         except ImportError:
             pass
 

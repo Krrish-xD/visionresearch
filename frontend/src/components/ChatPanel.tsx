@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Send, Bot, User } from 'lucide-react';
 import styles from './ChatPanel.module.css';
 
@@ -11,12 +11,30 @@ interface Message {
   content: string;
 }
 
+const WELCOME: Message = { role: 'assistant', content: 'Ask me anything about this image!' };
+
 export function ChatPanel({ taskId }: ChatPanelProps) {
-  const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: 'Ask me anything about this image!' }
-  ]);
+  const [messages, setMessages] = useState<Message[]>([WELCOME]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  // Load persisted chat history whenever the taskId changes
+  useEffect(() => {
+    if (!taskId) return;
+    fetch(`/api/history/${taskId}`)
+      .then(r => r.json())
+      .then(data => {
+        const history: Message[] = data.chat_history || [];
+        setMessages(history.length > 0 ? history : [WELCOME]);
+      })
+      .catch(() => setMessages([WELCOME]));
+  }, [taskId]);
+
+  // Auto-scroll to bottom on new messages
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, isLoading]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,7 +55,12 @@ export function ChatPanel({ taskId }: ChatPanelProps) {
       if (!response.ok) throw new Error('Failed to fetch response');
       const data = await response.json();
       
-      setMessages(prev => [...prev, { role: 'assistant', content: data.answer || data.error }]);
+      // Sync the full history from the server (source of truth)
+      if (data.history && data.history.length > 0) {
+        setMessages(data.history);
+      } else {
+        setMessages(prev => [...prev, { role: 'assistant', content: data.answer || data.error }]);
+      }
     } catch (err: any) {
       setMessages(prev => [...prev, { role: 'assistant', content: `Error: ${err.message}` }]);
     } finally {
@@ -66,6 +89,7 @@ export function ChatPanel({ taskId }: ChatPanelProps) {
             </div>
           </div>
         )}
+        <div ref={bottomRef} />
       </div>
 
       <form className={styles.inputArea} onSubmit={handleSubmit}>

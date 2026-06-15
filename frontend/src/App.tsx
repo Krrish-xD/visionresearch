@@ -10,6 +10,7 @@ interface TaskSession {
   id: string;
   file?: File;
   historyId?: string;
+  existingTaskId?: string;
 }
 
 function App() {
@@ -17,14 +18,45 @@ function App() {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
 
-  const handleUpload = (files: File[]) => {
-    const newSessions = files.map(f => ({
-      id: Math.random().toString(36).substring(7),
-      file: f
-    }));
-    setSessions(prev => [...prev, ...newSessions]);
-    if (!activeSessionId && newSessions.length > 0) {
-      setActiveSessionId(newSessions[0].id);
+  const handleUpload = async (files: File[]) => {
+    for (const file of files) {
+      if (file.type.startsWith('video/')) {
+        const formData = new FormData();
+        formData.append('video', file);
+        try {
+          const res = await fetch('/api/analyze/video', { method: 'POST', body: formData });
+          if (!res.ok) throw new Error('Video upload failed');
+          const data = await res.json();
+          
+          const newSessions = data.task_ids.map((id: string) => ({
+            id: Math.random().toString(36).substring(7),
+            existingTaskId: id
+          }));
+          
+          setSessions(prev => {
+            const updated = [...prev, ...newSessions];
+            if (!activeSessionId && updated.length > 0) {
+              setActiveSessionId(updated[0].id);
+            }
+            return updated;
+          });
+        } catch (err) {
+          console.error("Failed to process video", err);
+          alert("Failed to process video");
+        }
+      } else {
+        const newSession = {
+          id: Math.random().toString(36).substring(7),
+          file: file
+        };
+        setSessions(prev => {
+          const updated = [...prev, newSession];
+          if (!activeSessionId) {
+            setActiveSessionId(newSession.id);
+          }
+          return updated;
+        });
+      }
     }
   };
 

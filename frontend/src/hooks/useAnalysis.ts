@@ -54,6 +54,28 @@ export function useAnalysis() {
     }
   }, [reset, setEvents]);
 
+  const connectToExisting = useCallback(async (id: string) => {
+    reset();
+    setIsAnalyzing(true);
+    setTaskId(id);
+    
+    try {
+      const response = await fetch(`/api/history/${id}`);
+      if (!response.ok) throw new Error('Failed to fetch task metadata');
+      const data = await response.json();
+      
+      const extMatch = data.filename.match(/\.[^.]+$/);
+      const ext = extMatch ? extMatch[0] : '.jpg';
+      setUploadedImageUrl(`/uploads/${id}${ext}`);
+      
+      // Connect to SSE stream
+      connect(id);
+    } catch(err: any) {
+      setUploadError(err.message);
+      setIsAnalyzing(false);
+    }
+  }, [reset, connect]);
+
   const uploadAndAnalyze = useCallback(async (file: File) => {
     reset();
     setIsAnalyzing(true);
@@ -151,6 +173,7 @@ export function useAnalysis() {
   return {
     uploadAndAnalyze,
     loadHistory,
+    connectToExisting,
     isAnalyzing,
     progress: progressPercent,
     error: uploadError || sseError,

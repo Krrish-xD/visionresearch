@@ -34,12 +34,13 @@ class NSFWDetector(BaseAnalyzer):
         from transformers import AutoImageProcessor, AutoModelForImageClassification
         
         self.device = "cuda" if device.startswith("cuda") else "cpu"
-        dtype = torch.float16 if self.device == "cuda" else torch.float32
+        # Always float32 — avoids Half/Float mismatch without meaningful speed cost on ViT
+        self._dtype = torch.float32
         
         def _load():
             self.processor = AutoImageProcessor.from_pretrained(self.model_id)
             self.model = AutoModelForImageClassification.from_pretrained(
-                self.model_id, torch_dtype=dtype
+                self.model_id, torch_dtype=torch.float32
             ).to(self.device)
             self.model.eval()
             
@@ -51,9 +52,11 @@ class NSFWDetector(BaseAnalyzer):
             raise RuntimeError("Model not loaded")
 
         def _infer():
-            inputs = self.processor(images=image, return_tensors="pt").to(
-                self.device, self.model.dtype
-            )
+            raw = self.processor(images=image, return_tensors="pt")
+            # Explicitly cast pixel_values only — avoids BatchEncoding.to() dtype issues
+            inputs = {
+                "pixel_values": raw["pixel_values"].to(self.device, self._dtype)
+            }
             
             with torch.no_grad():
                 outputs = self.model(**inputs)
