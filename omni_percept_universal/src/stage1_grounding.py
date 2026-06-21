@@ -37,10 +37,7 @@ def run_grounding_and_masking(image_path, output_dir, counting_target=None):
         orig_image = Image.open(image_path).convert("RGB")
         
         # --- Pass 1: Global Detection (Multi-Scale Fallback) ---
-        if counting_target:
-            task_prompt = f"<CAPTION_TO_PHRASE_GROUNDING> {counting_target}"
-        else:
-            task_prompt = "<OD>"
+        task_prompt = "<OD>"
             
         scales = [1.0, 0.75, 0.5, 0.35]
         found_bboxes = False
@@ -105,9 +102,10 @@ def run_grounding_and_masking(image_path, output_dir, counting_target=None):
             all_bboxes = []
             all_labels = []
             
+            patch_task_prompt = f"<CAPTION_TO_PHRASE_GROUNDING> {counting_target}"
             for px1, py1, px2, py2 in patches:
                 patch = orig_image.crop((px1, py1, px2, py2))
-                inputs = processor(text=task_prompt, images=patch, return_tensors="pt").to(device)
+                inputs = processor(text=patch_task_prompt, images=patch, return_tensors="pt").to(device)
                 with torch.no_grad():
                     generated_ids = model.generate(
                         input_ids=inputs["input_ids"],
@@ -116,8 +114,8 @@ def run_grounding_and_masking(image_path, output_dir, counting_target=None):
                         num_beams=3
                     )
                 generated_text = processor.batch_decode(generated_ids, skip_special_tokens=False)[0]
-                parsed_answer = processor.post_process_generation(generated_text, task=task_prompt, image_size=(patch.width, patch.height))
-                results = parsed_answer.get(task_prompt, {})
+                parsed_answer = processor.post_process_generation(generated_text, task=patch_task_prompt, image_size=(patch.width, patch.height))
+                results = parsed_answer.get(patch_task_prompt, {})
                 
                 if "bboxes" in results and len(results["bboxes"]) > 0:
                     for box, label in zip(results["bboxes"], results.get("bboxes_labels", results.get("labels", []))):
@@ -153,79 +151,79 @@ def run_grounding_and_masking(image_path, output_dir, counting_target=None):
             )
             
             # --- Pass 2: Foveal Part-Segmentation ---
-            if counting_target:
-                print(f"[Stage 1] Skipping foveal crop for counting route...")
-            else:
-                print(f"[Stage 1] Found {len(detections)} objects. Running foveal crop part-detection...")
-                
-                parts_map_vocab = {
-                    "dog": "nose, eyes", "cat": "nose, eyes", "eagle": "nose, eyes", "bird": "nose, eyes",
-                    "truck": "door, wheel, window", "car": "door, wheel, window", "bus": "door, wheel, window"
-                }
-                
-                for idx, box in enumerate(xyxy):
-                    parts_map[idx] = []
-                    x1, y1, x2, y2 = [int(v) for v in box]
-                    # Ensure valid crop
-                    if x2 > x1 and y2 > y1:
-                        crop = orig_image.crop((x1, y1, x2, y2))
+            print(f"[Stage 1] Found {len(detections)} objects. Running foveal crop part-detection...")
+            
+            parts_map_vocab = {
+                "dog": "nose, eyes", "cat": "nose, eyes", "eagle": "nose, eyes", "bird": "nose, eyes",
+                "truck": "door, wheel, window", "car": "door, wheel, window", "bus": "door, wheel, window"
+            }
+            
+            for idx, box in enumerate(xyxy):
+                parts_map[idx] = []
+                x1, y1, x2, y2 = [int(v) for v in box]
+                # Ensure valid crop
+                if x2 > x1 and y2 > y1:
+                    crop = orig_image.crop((x1, y1, x2, y2))
+                    
+                    main_label = "head"
+                    if len(class_ids) > idx:
+                        main_label = classes[class_ids[idx]].lower()
                         
-                        main_label = "head"
-                        if len(class_ids) > idx:
-                            main_label = classes[class_ids[idx]].lower()
-                            
-                        part_prompt = parts_map_vocab.get(main_label, "head")
+                    if counting_target:
+                        part_prompt = counting_target
+                    else:
+                        part_prompt = parts_map_vocab.get(main_label, "nose, eyes, head")
                         if "head" not in part_prompt:
                             part_prompt += ", head"
-                            
-                        part_prompt_full = f"<CAPTION_TO_PHRASE_GROUNDING> {part_prompt}"
-                        print(f"[Stage 1] Looking for '{part_prompt}' on '{main_label}'")
                         
-                        crop_inputs = processor(text=part_prompt_full, images=crop, return_tensors="pt").to(device)
-                        try:
-                            with torch.no_grad():
-                                crop_gen_ids = model.generate(
-                                    input_ids=crop_inputs["input_ids"],
-                                    pixel_values=crop_inputs["pixel_values"],
-                                    max_new_tokens=1024,
-                                    num_beams=3
-                                )
-                            crop_gen_text = processor.batch_decode(crop_gen_ids, skip_special_tokens=False)[0]
-                            crop_parsed = processor.post_process_generation(crop_gen_text, task="<CAPTION_TO_PHRASE_GROUNDING>", image_size=(crop.width, crop.height))
+                    part_prompt_full = f"<CAPTION_TO_PHRASE_GROUNDING> {part_prompt}"
+                    print(f"[Stage 1] Looking for '{part_prompt}' on '{main_label}'")
+                        
+                    crop_inputs = processor(text=part_prompt_full, images=crop, return_tensors="pt").to(device)
+                    try:
+                        with torch.no_grad():
+                            crop_gen_ids = model.generate(
+                                input_ids=crop_inputs["input_ids"],
+                                pixel_values=crop_inputs["pixel_values"],
+                                max_new_tokens=1024,
+                                num_beams=3
+                            )
+                        crop_gen_text = processor.batch_decode(crop_gen_ids, skip_special_tokens=False)[0]
+                        crop_parsed = processor.post_process_generation(crop_gen_text, task="<CAPTION_TO_PHRASE_GROUNDING>", image_size=(crop.width, crop.height))
+                        
+                        crop_results = crop_parsed.get("<CAPTION_TO_PHRASE_GROUNDING>", {})
+                        
+                        if "bboxes" in crop_results and len(crop_results["bboxes"]) > 0:
+                            cb_boxes = crop_results["bboxes"]
+                            cb_labels = crop_results.get("labels", [])
                             
-                            crop_results = crop_parsed.get("<CAPTION_TO_PHRASE_GROUNDING>", {})
-                            
-                            if "bboxes" in crop_results and len(crop_results["bboxes"]) > 0:
-                                cb_boxes = crop_results["bboxes"]
-                                cb_labels = crop_results.get("labels", [])
+                            for c_idx, c_label in enumerate(cb_labels):
+                                c_label_lower = c_label.lower()
+                                final_label = None
                                 
-                                for c_idx, c_label in enumerate(cb_labels):
-                                    c_label_lower = c_label.lower()
-                                    final_label = None
+                                vocab_words = [w.strip() for w in part_prompt.split(",")]
+                                for vocab_word in vocab_words:
+                                    if vocab_word in c_label_lower:
+                                        final_label = vocab_word
+                                        break
+                                if not final_label and "eye" in c_label_lower:
+                                    final_label = "eyes"
                                     
-                                    vocab_words = [w.strip() for w in part_prompt.split(",")]
-                                    for vocab_word in vocab_words:
-                                        if vocab_word in c_label_lower:
-                                            final_label = vocab_word
-                                            break
-                                    if not final_label and "eye" in c_label_lower:
-                                        final_label = "eyes"
-                                        
-                                    if final_label:
-                                        hx1, hy1, hx2, hy2 = cb_boxes[c_idx]
-                                        global_hx1 = hx1 + x1
-                                        global_hy1 = hy1 + y1
-                                        global_hx2 = hx2 + x1
-                                        global_hy2 = hy2 + y1
-                                        
-                                        # Don't add duplicate labels
-                                        if not any(p["label"] == final_label for p in parts_map[idx]):
-                                            parts_map[idx].append({
-                                                "label": final_label, 
-                                                "bbox_xyxy": [global_hx1, global_hy1, global_hx2, global_hy2]
-                                            })
-                        except Exception as e:
-                            print(f"[Stage 1] Failed to detect sub-features for object {idx}: {e}")
+                                if final_label:
+                                    hx1, hy1, hx2, hy2 = cb_boxes[c_idx]
+                                    global_hx1 = hx1 + x1
+                                    global_hy1 = hy1 + y1
+                                    global_hx2 = hx2 + x1
+                                    global_hy2 = hy2 + y1
+                                    
+                                    # Don't add duplicate labels
+                                    if not any(p["label"] == final_label for p in parts_map[idx]):
+                                        parts_map[idx].append({
+                                            "label": final_label, 
+                                            "bbox_xyxy": [global_hx1, global_hy1, global_hx2, global_hy2]
+                                        })
+                    except Exception as e:
+                        print(f"[Stage 1] Failed to detect sub-features for object {idx}: {e}")
         else:
             raise ValueError("Florence-2 returned no bounding boxes.")
             

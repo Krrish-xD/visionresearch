@@ -40,7 +40,15 @@ def execute_pipeline(image_path, critical_question):
         annotated_img_path, json_path, grounding_data = run_grounding_and_masking(image_path, output_dir, counting_target=target_noun)
         clear_memory()
         
-        mask_count = len(grounding_data) if grounding_data else 0
+        mask_count = 0
+        if grounding_data:
+            for obj in grounding_data:
+                if target_noun.lower() in obj["label"].lower():
+                    mask_count += 1
+                for part in obj.get("parts", []):
+                    if target_noun.lower() in part["label"].lower():
+                        mask_count += 1
+                        
         final_report = run_vlm_generation(None, None, critical_question, None, image_path, mask_count=mask_count, counting_target=target_noun)
         yield (annotated_img_path if annotated_img_path else gr.update(), "Skipped (Counting Query)", "Skipped (Counting Query)", final_report)
         return
@@ -50,7 +58,15 @@ def execute_pipeline(image_path, critical_question):
         annotated_img_path, json_path, grounding_data = run_grounding_and_masking(image_path, output_dir, counting_target=target_noun)
         clear_memory()
         
-        mask_count = len(grounding_data) if grounding_data else 0
+        mask_count = 0
+        if grounding_data:
+            for obj in grounding_data:
+                if target_noun.lower() in obj["label"].lower():
+                    mask_count += 1
+                for part in obj.get("parts", []):
+                    if target_noun.lower() in part["label"].lower():
+                        mask_count += 1
+                        
         final_report = run_vlm_generation(None, None, critical_question, None, image_path, mask_count=mask_count, counting_target=target_noun, presence_mode=True)
         yield (annotated_img_path if annotated_img_path else gr.update(), "Skipped (Presence Query)", "Skipped (Presence Query)", final_report)
         return

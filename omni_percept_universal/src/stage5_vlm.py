@@ -58,9 +58,19 @@ Critical Question: {critical_question}
     }
     
     if image_path and os.path.exists(image_path):
-        with open(image_path, "rb") as f:
-            img_b64 = base64.b64encode(f.read()).decode("utf-8")
-        payload["images"] = [img_b64]
+        from PIL import Image
+        import io
+        try:
+            with Image.open(image_path) as img:
+                if img.mode != "RGB":
+                    img = img.convert("RGB")
+                img.thumbnail((1024, 1024))
+                buffer = io.BytesIO()
+                img.save(buffer, format="JPEG")
+                img_b64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
+                payload["images"] = [img_b64]
+        except Exception as e:
+            print(f"[Stage 5] Warning: Failed to process image for VLM: {e}")
     
     try:
         response = requests.post(url, json=payload)

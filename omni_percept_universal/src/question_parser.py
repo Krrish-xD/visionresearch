@@ -52,5 +52,9 @@ def parse_question_type(question, detected_objects=None):
         for obj in detected_objects:
             if obj['label'].lower() in question_lower:
                 relevant_objects.append(obj)
+                
+        # Fallback: if no objects explicitly matched the label but we have generic terms
+        if not relevant_objects and any(generic in question_lower for generic in ["animal", "object", "person", "item", "it", "bird", "vehicle"]):
+            relevant_objects = detected_objects
             
     return category, relevant_objects, target_noun
