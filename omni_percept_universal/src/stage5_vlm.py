@@ -4,7 +4,7 @@ import os
 from requests.exceptions import ConnectionError
 from .memory_utils import clear_memory
 
-def run_vlm_generation(z3_facts, rag_context, critical_question, detected_list=None, image_path=None, direct_vlm=False, mask_count=None, counting_target=None):
+def run_vlm_generation(z3_facts, rag_context, critical_question, detected_list=None, image_path=None, direct_vlm=False, mask_count=None, counting_target=None, presence_mode=False):
     """
     Stage 5: Constrained Generation (VLM)
     Uses local Ollama API to answer the user's question based on proven facts.
@@ -17,7 +17,12 @@ def run_vlm_generation(z3_facts, rag_context, critical_question, detected_list=N
     z3_empty = not z3_facts or "No spatial relationships proven" in z3_facts
     rag_empty = not rag_context or "No relevant spatial context found" in rag_context
     
-    if mask_count is not None:
+    if presence_mode:
+        if mask_count > 0:
+            prompt = f"Mathematical detection PROVED the existence of {counting_target}. Do not guess. Confirm you see the {counting_target}.\nQuestion: {critical_question}"
+        else:
+            prompt = f"Mathematical detection found NO instances of {counting_target}. State that it is not visible.\nQuestion: {critical_question}"
+    elif mask_count is not None:
         if mask_count == 0:
             prompt = f"Mathematical detection failed to find {counting_target}. Attempt best-effort visual analysis and mark as UNVERIFIED.\nQuestion: {critical_question}"
         else:

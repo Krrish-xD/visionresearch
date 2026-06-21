@@ -27,7 +27,7 @@ def execute_pipeline(image_path, critical_question):
     os.makedirs(output_dir, exist_ok=True)
     
     # Smart Parse (Early Routing)
-    category, relevant_objects, counting_target = parse_question_type(critical_question)
+    category, relevant_objects, target_noun = parse_question_type(critical_question)
     
     if category in ["ATTRIBUTE", "GENERAL"]:
         yield (gr.update(), "Skipped (Non-Spatial Query)", "Skipped (Non-Spatial Query)", "Routing: Direct VLM (Non-Spatial Query)...")
@@ -37,12 +37,22 @@ def execute_pipeline(image_path, critical_question):
         
     if category == "COUNTING":
         yield (gr.update(), "Skipped (Counting Query)", "Skipped (Counting Query)", "Routing: Mathematical Counting (Florence-2 + FastSAM)...")
-        annotated_img_path, json_path, grounding_data = run_grounding_and_masking(image_path, output_dir, counting_target=counting_target)
+        annotated_img_path, json_path, grounding_data = run_grounding_and_masking(image_path, output_dir, counting_target=target_noun)
         clear_memory()
         
         mask_count = len(grounding_data) if grounding_data else 0
-        final_report = run_vlm_generation(None, None, critical_question, None, image_path, mask_count=mask_count, counting_target=counting_target)
+        final_report = run_vlm_generation(None, None, critical_question, None, image_path, mask_count=mask_count, counting_target=target_noun)
         yield (annotated_img_path if annotated_img_path else gr.update(), "Skipped (Counting Query)", "Skipped (Counting Query)", final_report)
+        return
+
+    if category == "PRESENCE":
+        yield (gr.update(), "Skipped (Presence Query)", "Skipped (Presence Query)", "Routing: Provable Presence (Florence-2)...")
+        annotated_img_path, json_path, grounding_data = run_grounding_and_masking(image_path, output_dir, counting_target=target_noun)
+        clear_memory()
+        
+        mask_count = len(grounding_data) if grounding_data else 0
+        final_report = run_vlm_generation(None, None, critical_question, None, image_path, mask_count=mask_count, counting_target=target_noun, presence_mode=True)
+        yield (annotated_img_path if annotated_img_path else gr.update(), "Skipped (Presence Query)", "Skipped (Presence Query)", final_report)
         return
 
     # STAGE 1: Grounding & Masking

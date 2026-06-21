@@ -6,7 +6,7 @@ def parse_question_type(question, detected_objects=None):
     """
     question_lower = question.lower()
     category = "GENERAL"
-    counting_target = None
+    target_noun = None
     
     # Categorization heuristics
     if any(w in question_lower for w in ["how many", "number of", "count the"]):
@@ -21,7 +21,20 @@ def parse_question_type(question, detected_objects=None):
                 if w in stop_words:
                     break
                 filtered.append(w)
-            counting_target = " ".join(filtered) if filtered else words[0]
+            target_noun = " ".join(filtered) if filtered else words[0]
+    elif any(w in question_lower for w in ["is there a", "do you see a", "is there any", "can you see a", "can you see any"]):
+        category = "PRESENCE"
+        match = re.search(r'(?:is there a|do you see a|is there any|can you see a|can you see any)\s+([^?.!,]+)', question_lower)
+        if match:
+            extracted = match.group(1).strip()
+            words = extracted.split()
+            stop_words = ["in", "on", "the", "at", "around", "behind"]
+            filtered = []
+            for w in words:
+                if w in stop_words:
+                    break
+                filtered.append(w)
+            target_noun = " ".join(filtered) if filtered else words[0]
     elif any(w in question_lower for w in ["color", "what kind", "material", "texture", "breed", "type"]):
         category = "ATTRIBUTE"
     elif any(w in question_lower for w in ["facing left", "facing right", "point left", "point right", "pointing"]):
@@ -40,4 +53,4 @@ def parse_question_type(question, detected_objects=None):
             if obj['label'].lower() in question_lower:
                 relevant_objects.append(obj)
             
-    return category, relevant_objects, counting_target
+    return category, relevant_objects, target_noun

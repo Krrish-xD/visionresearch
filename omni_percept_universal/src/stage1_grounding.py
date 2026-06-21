@@ -91,6 +91,60 @@ def run_grounding_and_masking(image_path, output_dir, counting_target=None):
                 found_bboxes = True
                 break
                 
+        if not found_bboxes and counting_target:
+            print("[Stage 1] Multi-Scale failed. Triggering Patch-Based Dense Grounding...")
+            w, h = orig_image.size
+            mid_x, mid_y = w // 2, h // 2
+            patches = [
+                (0, 0, mid_x, mid_y),            # Top-Left
+                (mid_x, 0, w, mid_y),            # Top-Right
+                (0, mid_y, mid_x, h),            # Bottom-Left
+                (mid_x, mid_y, w, h)             # Bottom-Right
+            ]
+            
+            all_bboxes = []
+            all_labels = []
+            
+            for px1, py1, px2, py2 in patches:
+                patch = orig_image.crop((px1, py1, px2, py2))
+                inputs = processor(text=task_prompt, images=patch, return_tensors="pt").to(device)
+                with torch.no_grad():
+                    generated_ids = model.generate(
+                        input_ids=inputs["input_ids"],
+                        pixel_values=inputs["pixel_values"],
+                        max_new_tokens=1024,
+                        num_beams=3
+                    )
+                generated_text = processor.batch_decode(generated_ids, skip_special_tokens=False)[0]
+                parsed_answer = processor.post_process_generation(generated_text, task=task_prompt, image_size=(patch.width, patch.height))
+                results = parsed_answer.get(task_prompt, {})
+                
+                if "bboxes" in results and len(results["bboxes"]) > 0:
+                    for box, label in zip(results["bboxes"], results.get("bboxes_labels", results.get("labels", []))):
+                        global_box = [box[0] + px1, box[1] + py1, box[2] + px1, box[3] + py1]
+                        all_bboxes.append(global_box)
+                        all_labels.append(label)
+                        
+            if all_bboxes:
+                xyxy = np.array(all_bboxes)
+                result_labels = all_labels
+                confidence = np.ones(len(xyxy))
+                
+                class_ids = []
+                for label in result_labels:
+                    matched = False
+                    for i, c in enumerate(classes):
+                        if c.lower() in label.lower() or label.lower() in c.lower():
+                            class_ids.append(i)
+                            matched = True
+                            break
+                    if not matched:
+                        classes.append(label)
+                        class_ids.append(len(classes) - 1)
+                        
+                found_bboxes = True
+                print(f"[Stage 1] Patch-Based Dense Grounding succeeded. Found {len(xyxy)} parts.")
+                
         if found_bboxes:
             detections = sv.Detections(
                 xyxy=xyxy,
@@ -103,14 +157,31 @@ def run_grounding_and_masking(image_path, output_dir, counting_target=None):
                 print(f"[Stage 1] Skipping foveal crop for counting route...")
             else:
                 print(f"[Stage 1] Found {len(detections)} objects. Running foveal crop part-detection...")
+                
+                parts_map_vocab = {
+                    "dog": "nose, eyes", "cat": "nose, eyes", "eagle": "nose, eyes", "bird": "nose, eyes",
+                    "truck": "door, wheel, window", "car": "door, wheel, window", "bus": "door, wheel, window"
+                }
+                
                 for idx, box in enumerate(xyxy):
                     parts_map[idx] = []
                     x1, y1, x2, y2 = [int(v) for v in box]
                     # Ensure valid crop
                     if x2 > x1 and y2 > y1:
                         crop = orig_image.crop((x1, y1, x2, y2))
-                        part_prompt = "<CAPTION_TO_PHRASE_GROUNDING> nose, eyes, snout, head"
-                        crop_inputs = processor(text=part_prompt, images=crop, return_tensors="pt").to(device)
+                        
+                        main_label = "head"
+                        if len(class_ids) > idx:
+                            main_label = classes[class_ids[idx]].lower()
+                            
+                        part_prompt = parts_map_vocab.get(main_label, "head")
+                        if "head" not in part_prompt:
+                            part_prompt += ", head"
+                            
+                        part_prompt_full = f"<CAPTION_TO_PHRASE_GROUNDING> {part_prompt}"
+                        print(f"[Stage 1] Looking for '{part_prompt}' on '{main_label}'")
+                        
+                        crop_inputs = processor(text=part_prompt_full, images=crop, return_tensors="pt").to(device)
                         try:
                             with torch.no_grad():
                                 crop_gen_ids = model.generate(
@@ -132,12 +203,13 @@ def run_grounding_and_masking(image_path, output_dir, counting_target=None):
                                     c_label_lower = c_label.lower()
                                     final_label = None
                                     
-                                    if "nose" in c_label_lower or "snout" in c_label_lower:
-                                        final_label = "nose"
-                                    elif "eye" in c_label_lower: # handles eye and eyes
+                                    vocab_words = [w.strip() for w in part_prompt.split(",")]
+                                    for vocab_word in vocab_words:
+                                        if vocab_word in c_label_lower:
+                                            final_label = vocab_word
+                                            break
+                                    if not final_label and "eye" in c_label_lower:
                                         final_label = "eyes"
-                                    elif "head" in c_label_lower:
-                                        final_label = "head"
                                         
                                     if final_label:
                                         hx1, hy1, hx2, hy2 = cb_boxes[c_idx]
