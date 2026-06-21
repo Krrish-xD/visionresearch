@@ -60,7 +60,7 @@ def execute_pipeline(image_path, critical_question):
         return
         
     # Re-extract objects now that grounding_data is available
-    _, relevant_objects = parse_question_type(critical_question, grounding_data)
+    _, relevant_objects, _ = parse_question_type(critical_question, grounding_data)
         
     # STAGE 2: Geometry Extraction
     yield (
