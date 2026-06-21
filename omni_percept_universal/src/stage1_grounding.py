@@ -172,9 +172,25 @@ def run_grounding_and_masking(image_path, output_dir, counting_target=None):
                     if counting_target:
                         part_prompt = counting_target
                     else:
-                        part_prompt = parts_map_vocab.get(main_label, "nose, eyes, head")
-                        if "head" not in part_prompt:
+                        part_prompt = None
+                        for key, prompt in parts_map_vocab.items():
+                            if key in main_label:
+                                part_prompt = prompt
+                                break
+                        
+                        if not part_prompt:
+                            non_living_keywords = ["mirror", "wheel", "window", "door", "light", "reflector", "wiper", "bumper", "tire", "plate", "windshield", "engine", "seat", "handle", "sign", "tree", "plant", "flower", "grass", "road", "sky", "building", "house", "wall", "fence", "pole", "wire"]
+                            if any(kw in main_label for kw in non_living_keywords):
+                                part_prompt = None
+                            else:
+                                part_prompt = "nose, eyes, head"
+                                
+                        if part_prompt and "head" not in part_prompt and not any(v in main_label for v in ["bus", "car", "truck", "vehicle", "van", "train", "plane"]):
                             part_prompt += ", head"
+                            
+                    if not part_prompt:
+                        print(f"[Stage 1] Skipping part-detection for '{main_label}' (Non-living or no parts specified).")
+                        continue
                         
                     part_prompt_full = f"<CAPTION_TO_PHRASE_GROUNDING> {part_prompt}"
                     print(f"[Stage 1] Looking for '{part_prompt}' on '{main_label}'")

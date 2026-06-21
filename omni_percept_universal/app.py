@@ -33,4 +33,6 @@ with gr.Blocks(theme=gr.themes.Soft(), title="Omni-Percept Universal Pipeline") 
     )
 
 if __name__ == "__main__":
-    app.launch(share=False)
+    import os
+    output_dir = os.path.join(os.path.dirname(__file__), "data", "temp")
+    app.launch(share=False, allowed_paths=[output_dir])
