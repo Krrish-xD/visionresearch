@@ -136,8 +136,11 @@ class PipelineOrchestrator:
 
             # Load all models for this stage
             for module in stage_modules:
-                if module.requires_gpu:
-                    await self.model_manager.ensure_loaded(module)
+                if module.requires_gpu or module.name == "ocr":
+                    try:
+                        await self.model_manager.ensure_loaded(module)
+                    except Exception as e:
+                        logger.error(f"Failed to pre-load model for {module.name}: {e}")
 
             # Run modules in this stage (parallel for CPU modules, sequential otherwise)
             if stage_num == 0:
@@ -180,7 +183,7 @@ class PipelineOrchestrator:
 
             # Unload GPU models from this stage (free VRAM for next stage)
             for module in stage_modules:
-                if module.requires_gpu:
+                if module.requires_gpu or module.name == "ocr":
                     await self.model_manager.ensure_unloaded(module)
 
         # Build final result

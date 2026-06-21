@@ -21,6 +21,7 @@ class SigLIPAnalyzer(BaseAnalyzer):
     stage: int = 2
 
     def __init__(self, model_id: str = "google/siglip-base-patch16-224"):
+        super().__init__()
         self.model_id = model_id
         self.model = None
         self.processor = None
@@ -54,7 +55,7 @@ class SigLIPAnalyzer(BaseAnalyzer):
 
     async def analyze(self, image: PIL.Image.Image, **kwargs: Any) -> dict:
         if self.model is None:
-            raise RuntimeError("Model not loaded")
+            await self.load_model()
 
         start_time = time.time()
         

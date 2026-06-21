@@ -117,12 +117,8 @@ class SceneCaptioner(BaseAnalyzer):
             raise RuntimeError("Model not loaded")
             
         def _qa():
-            import re
-            
-            # Florence-2 <VQA> is a visual grounding task — its output is messy.
-            # Wrapping the question as a detailed-caption prompt yields much cleaner text.
-            task = "<MORE_DETAILED_CAPTION>"
-            prompt = f"{task} {question}"
+            task = "<VQA>"
+            prompt = f"{task}{question}"
             
             inputs = self.processor(
                 text=prompt, images=image, return_tensors="pt"
@@ -137,29 +133,27 @@ class SceneCaptioner(BaseAnalyzer):
                 num_beams=3,
             )
             
-            # Decode with skip_special_tokens=True to strip <s>, </s>, <pad>
+            # Must use skip_special_tokens=False for post_process_generation
             raw = self.processor.tokenizer.batch_decode(
-                generated_ids, skip_special_tokens=True
+                generated_ids, skip_special_tokens=False
             )[0]
             
-            answer = raw
+            parsed = self.processor.post_process_generation(
+                raw, task=task, image_size=(image.width, image.height)
+            )
+            answer = parsed.get(task, raw)
             
-            # Strip ALL Florence-2 task/location/region tokens:
-            # <VQA>, <CAPTION>, <loc_42>, <ref>, </ref>, etc.
-            answer = re.sub(r"</?[A-Z_]+>", "", answer)      # task tags
-            answer = re.sub(r"<loc_\d+>", "", answer)         # location tokens
-            answer = re.sub(r"<[^>]{0,40}>", "", answer)      # any remaining short tags
+            if isinstance(answer, str):
+                # Clean up Florence-2 quirks like "QA>"
+                answer = answer.replace("QA>", "").strip()
+                
+                # If it echoed the question, remove it
+                q_lower = question.strip().lower()
+                a_lower = answer.lower()
+                if a_lower.startswith(q_lower):
+                    answer = answer[len(question):].strip(" .,")
             
-            # Strip echoed task prompt prefix (e.g. "MORE_DETAILED_CAPTION")
-            answer = re.sub(r"^[A-Z_]+\s*", "", answer)
-            
-            # Strip echoed question if the model repeated it at the start
-            q_lower = question.strip().lower()
-            a_lower = answer.strip().lower()
-            if a_lower.startswith(q_lower):
-                answer = answer[len(question):].strip(" .,")
-            
-            return answer.strip() or "I'm not sure — try asking a more specific question about the image."
+            return str(answer).strip() or "I'm not sure — try asking a more specific question about the image."
             
         return await asyncio.to_thread(_qa)
 
