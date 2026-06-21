@@ -95,7 +95,23 @@ class ModelManager:
             f"Loading '{module.name}' ({needed}MB) on {self.device} "
             f"[{self._vram_used_mb}MB / {self.vram_budget_mb}MB used]"
         )
-        await module.load_model(device=self.device)
+        try:
+            await module.load_model(device=self.device)
+        except RuntimeError as e:
+            err_msg = str(e).lower()
+            if "allocate" in err_msg or "memory" in err_msg or "oom" in err_msg:
+                logger.warning(f"OOM during load of {module.name}. Trying to recover...")
+                import torch
+                import gc
+                import asyncio
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+                gc.collect()
+                await asyncio.sleep(2)
+                logger.info(f"Retrying load of {module.name} after clearing VRAM...")
+                await module.load_model(device=self.device)
+            else:
+                raise
         self._loaded[module.name] = LoadedModelInfo(
             module=module,
             vram_mb=needed,

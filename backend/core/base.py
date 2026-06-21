@@ -91,7 +91,29 @@ class BaseAnalyzer(ABC):
         """
         start = time.perf_counter()
         try:
-            data = await self.analyze(image, **kwargs)
+            try:
+                data = await self.analyze(image, **kwargs)
+            except RuntimeError as e:
+                err_msg = str(e).lower()
+                if "allocate" in err_msg or "memory" in err_msg or "oom" in err_msg:
+                    import logging
+                    import torch
+                    import gc
+                    import asyncio
+                    
+                    logger = logging.getLogger(__name__)
+                    logger.warning(f"OOM during {self.name} analyze(). Trying to recover...")
+                    
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
+                    gc.collect()
+                    await asyncio.sleep(2)
+                    
+                    logger.info(f"Retrying {self.name} analyze() after clearing VRAM...")
+                    data = await self.analyze(image, **kwargs)
+                else:
+                    raise e
+                    
             elapsed_ms = (time.perf_counter() - start) * 1000
             return ModuleResult(
                 module_name=self.name,

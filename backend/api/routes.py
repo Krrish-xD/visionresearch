@@ -366,7 +366,8 @@ async def ask_question(task_id: str, payload: AskRequest, request: Request, db: 
         }
     except Exception as e:
         logger.exception("Error during VQA")
-        return {"error": str(e)}, 500
+        from fastapi.responses import JSONResponse
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
 
 @router.get("/status")

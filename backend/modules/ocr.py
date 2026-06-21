@@ -19,6 +19,7 @@ class OCRAnalyzer(BaseAnalyzer):
     stage: int = 2
 
     def __init__(self, lang: str = "en"):
+        super().__init__()
         self.lang = lang
         self.model = None
 
@@ -37,7 +38,7 @@ class OCRAnalyzer(BaseAnalyzer):
 
     async def analyze(self, image: PIL.Image.Image, **kwargs: Any) -> dict:
         if self.model is None:
-            raise RuntimeError("Model not loaded")
+            await self.load_model()
 
         start_time = time.time()
         

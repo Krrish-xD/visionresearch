@@ -22,6 +22,7 @@ class DepthAnalyzer(BaseAnalyzer):
     stage: int = 4
 
     def __init__(self, model_id: str = "depth-anything/Depth-Anything-V2-Small-hf"):
+        super().__init__()
         self.model_id = model_id
         self.pipe = None
 
@@ -43,7 +44,7 @@ class DepthAnalyzer(BaseAnalyzer):
 
     async def analyze(self, image: PIL.Image.Image, **kwargs: Any) -> dict:
         if self.pipe is None:
-            raise RuntimeError("Model not loaded")
+            await self.load_model()
 
         start_time = time.time()
         

@@ -139,3 +139,43 @@ async def test_vram_eviction():
     # It will actually need to evict both if possible, or fail.
     # In our implementation, it evicts LRU until it fits.
     assert manager.vram_used_mb <= 11000
+
+
+@pytest.mark.asyncio
+async def test_oom_retry_logic():
+    """Test that models recover from CUDA Out of Memory errors during analysis."""
+    
+    class DummyOOMModule(BaseAnalyzer):
+        name = "dummy_oom"
+        display_name = "Dummy OOM"
+        estimated_vram_mb = 100
+        requires_gpu = True
+        stage = 1
+        
+        def __init__(self):
+            super().__init__()
+            self.attempts = 0
+            
+        async def load_model(self, device="cpu"):
+            self._is_loaded = True
+            
+        async def analyze(self, image, **kwargs):
+            self.attempts += 1
+            if self.attempts == 1:
+                # Simulate a PyTorch CUDA OOM Error on the first try
+                raise RuntimeError("CUDA out of memory. Tried to allocate 256.00 MiB.")
+            return {"recovered": True, "attempts": self.attempts}
+            
+        async def unload_model(self):
+            self._is_loaded = False
+            
+    module = DummyOOMModule()
+    await module.load_model()
+    
+    # Run the analysis; it should fail internally on attempt 1, trigger the retry, and succeed on attempt 2
+    test_image = Image.new("RGB", (10, 10), color="blue")
+    result = await module.run(test_image)
+    
+    assert result.success is True
+    assert result.data["recovered"] is True
+    assert result.data["attempts"] == 2
