@@ -1,0 +1,13 @@
+gradio
+torch
+torchvision
+transformers
+ultralytics
+z3-solver
+chromadb
+ollama
+supervision
+opencv-python
+Pillow
+numpy
+requests
