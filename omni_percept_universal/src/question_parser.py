@@ -40,6 +40,10 @@ def parse_question_type(question, detected_objects=None):
                     break
                 filtered.append(w)
             target_noun = " ".join(filtered) if filtered else words[0]
+    elif any(w in question_lower for w in ["facing left", "facing right", "point left", "point right", "pointing"]):
+        category = "ABSOLUTE_ORIENTATION"
+    elif "facing" in question_lower or "look at" in question_lower or "looking at" in question_lower:
+        category = "RELATIVE_ORIENTATION"
     elif any(w in question_lower for w in ["on the left", "on the right", "left side", "right side", "left or right", "right or left"]):
         category = "RELATIVE_LOCATION"
         subject = "object"
@@ -59,10 +63,6 @@ def parse_question_type(question, detected_objects=None):
         target_noun = {"subject": subject, "reference": reference}
     elif any(w in question_lower for w in ["color", "what kind", "material", "texture", "breed", "type"]):
         category = "ATTRIBUTE"
-    elif any(w in question_lower for w in ["facing left", "facing right", "point left", "point right", "pointing"]):
-        category = "ABSOLUTE_ORIENTATION"
-    elif "facing" in question_lower or "look at" in question_lower or "looking at" in question_lower:
-        category = "RELATIVE_ORIENTATION"
     elif any(w in question_lower for w in ["behind", "occluded", "cover", "hide"]):
         category = "OCCLUSION"
     elif any(w in question_lower for w in ["how far", "distance", "close", "near", "next to"]):

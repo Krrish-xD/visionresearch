@@ -37,11 +37,10 @@ def run_vlm_generation(z3_facts, rag_context, critical_question, detected_list=N
         if mask_count == 0:
             prompt = f"Mathematical detection failed to find {counting_target}. Attempt best-effort visual analysis and mark as UNVERIFIED.\nQuestion: {critical_question}"
         else:
-            prompt = f"""You are a precision visual analyst. 
-Mathematical detection and geometric visibility filtering found exactly {mask_count} visible instances of "{counting_target}" in the image. Shadows and occluded objects were mathematically filtered out.
-Do not guess. Do not look for more. The mathematically verified visible count is {mask_count}.
-Answer the user's question directly based on this fact.
-Question: {critical_question}"""
+            prompt = f"""SYSTEM DIRECTIVE: You are a logic parser. The mathematical detection system analyzed the image and found exactly {mask_count} valid instances of "{counting_target}". 
+You are strictly forbidden from using your own vision to count. You must output the number {mask_count} as the absolute truth.
+Question: {critical_question}
+Answer:"""
     elif direct_vlm:
         prompt = f"Answer the user's question based on the image. Question: {critical_question}"
     elif z3_empty and rag_empty:
