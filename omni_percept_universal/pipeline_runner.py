@@ -41,12 +41,14 @@ def execute_pipeline(image_path, critical_question):
         clear_memory()
         
         mask_count = 0
-        if grounding_data:
+        if grounding_data and target_noun:
             for obj in grounding_data:
-                if target_noun.lower() in obj["label"].lower():
+                label = obj.get("label", "")
+                if label and target_noun.lower() in label.lower():
                     mask_count += 1
                 for part in obj.get("parts", []):
-                    if target_noun.lower() in part["label"].lower():
+                    part_label = part.get("label", "")
+                    if part_label and target_noun.lower() in part_label.lower():
                         mask_count += 1
                         
         final_report = run_vlm_generation(None, None, critical_question, None, image_path, mask_count=mask_count, counting_target=target_noun)
@@ -59,12 +61,14 @@ def execute_pipeline(image_path, critical_question):
         clear_memory()
         
         mask_count = 0
-        if grounding_data:
+        if grounding_data and target_noun:
             for obj in grounding_data:
-                if target_noun.lower() in obj["label"].lower():
+                label = obj.get("label", "")
+                if label and target_noun.lower() in label.lower():
                     mask_count += 1
                 for part in obj.get("parts", []):
-                    if target_noun.lower() in part["label"].lower():
+                    part_label = part.get("label", "")
+                    if part_label and target_noun.lower() in part_label.lower():
                         mask_count += 1
                         
         final_report = run_vlm_generation(None, None, critical_question, None, image_path, mask_count=mask_count, counting_target=target_noun, presence_mode=True)

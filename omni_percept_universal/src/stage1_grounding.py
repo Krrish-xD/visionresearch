@@ -267,16 +267,18 @@ def run_grounding_and_masking(image_path, output_dir, counting_target=None):
         print("[Stage 1] No objects detected.")
         return None, None, []
         
-    # Combine bounding boxes for FastSAM (ONLY for main object and 'head' part)
+    # Combine bounding boxes for FastSAM (Main object, 'head', and counting_target parts)
     boxes_xyxy = detections.xyxy.tolist()
     head_indices = {} # Map from obj_idx -> combined_index
     current_idx = len(boxes_xyxy)
     
     for obj_idx, parts_list in parts_map.items():
         for part in parts_list:
-            if part["label"] == "head":
+            if part["label"] == "head" or (counting_target and counting_target.lower() in part["label"].lower()):
                 boxes_xyxy.append(part["bbox_xyxy"])
-                head_indices[obj_idx] = current_idx
+                if part["label"] == "head":
+                    head_indices[obj_idx] = current_idx
+                part["mask_idx"] = current_idx
                 current_idx += 1
         
     combined_boxes_np = np.array(boxes_xyxy)
@@ -387,11 +389,42 @@ def run_grounding_and_masking(image_path, output_dir, counting_target=None):
     annotated_img_path = os.path.join(output_dir, "annotated_image.jpg")
     cv2.imwrite(annotated_img_path, annotated_image)
     
+    # Calculate mask area threshold for counting_target
+    max_target_area = 0
+    if counting_target:
+        target_lower = counting_target.lower()
+        if detections.mask is not None:
+            for i in range(len(detections)):
+                class_id = detections.class_id[i] if detections.class_id is not None else 0
+                cls_name = classes[class_id] if class_id < len(classes) else f"Obj_{i}"
+                if target_lower in cls_name.lower():
+                    area = detections.mask[i].sum()
+                    if area > max_target_area:
+                        max_target_area = area
+                        
+        for obj_idx, parts_list in parts_map.items():
+            for part in parts_list:
+                if target_lower in part["label"].lower() and "mask_idx" in part:
+                    mask_idx = part["mask_idx"]
+                    if mask_idx < len(combined_masks):
+                        area = combined_masks[mask_idx].sum()
+                        if area > max_target_area:
+                            max_target_area = area
+                            
+    area_threshold = 0.15 * max_target_area
+
     # Prepare JSON output
     output_data = []
     for i in range(len(detections)):
         class_id = detections.class_id[i] if detections.class_id is not None else 0
         cls_name = classes[class_id] if class_id < len(classes) else f"Obj_{i}"
+        
+        # Check if main object is filtered out
+        if counting_target and counting_target.lower() in cls_name.lower() and detections.mask is not None:
+            area = detections.mask[i].sum()
+            if area < area_threshold or area < 500:
+                print(f"[Stage 1] Visibility Filter: Discarded main object '{cls_name}' with area {area} (< {area_threshold} or < 500)")
+                continue
         
         mask_path = os.path.join(output_dir, f"mask_{i}.npy")
         if detections.mask is not None:
@@ -413,8 +446,20 @@ def run_grounding_and_masking(image_path, output_dir, counting_target=None):
                     "bbox_xyxy": part["bbox_xyxy"]
                 }
                 
-                # Only head gets a mask path
-                if part["label"] == "head":
+                # Verify part filter
+                if counting_target and counting_target.lower() in part["label"].lower() and "mask_idx" in part:
+                    mask_idx = part["mask_idx"]
+                    area = combined_masks[mask_idx].sum()
+                    if area < area_threshold or area < 500:
+                        print(f"[Stage 1] Visibility Filter: Discarded part '{part['label']}' with area {area} (< {area_threshold} or < 500)")
+                        continue
+                
+                if "mask_idx" in part:
+                    part_mask_path = os.path.join(output_dir, f"mask_{i}_{part['label'].replace(' ', '_')}_{part['mask_idx']}.npy")
+                    mask_idx = part["mask_idx"]
+                    np.save(part_mask_path, combined_masks[mask_idx])
+                    part_data["mask_path"] = part_mask_path
+                elif part["label"] == "head" and i in head_indices:
                     head_mask_path = os.path.join(output_dir, f"mask_{i}_head.npy")
                     mask_idx = head_indices[i]
                     np.save(head_mask_path, combined_masks[mask_idx])

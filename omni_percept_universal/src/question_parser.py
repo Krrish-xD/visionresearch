@@ -10,9 +10,9 @@ def parse_question_type(question, detected_objects=None):
     
     # Categorization heuristics
     if any(w in question_lower for w in ["how many", "number of", "count the"]):
-        category = "COUNTING"
         match = re.search(r'(?:how many|number of|count the)\s+([^?.!,]+)', question_lower)
         if match:
+            category = "COUNTING"
             extracted = match.group(1).strip()
             words = extracted.split()
             stop_words = ["can", "are", "do", "is", "there", "in", "on", "the", "you"]
@@ -22,10 +22,15 @@ def parse_question_type(question, detected_objects=None):
                     break
                 filtered.append(w)
             target_noun = " ".join(filtered) if filtered else words[0]
+            
+            if target_noun and target_noun.endswith('s'):
+                blacklist = ["bus", "gas", "glass", "lens", "cross", "boss", "fuss", "miss"]
+                if target_noun.lower() not in blacklist and len(target_noun) > 3:
+                    target_noun = target_noun[:-1]
     elif any(w in question_lower for w in ["is there a", "do you see a", "is there any", "can you see a", "can you see any"]):
-        category = "PRESENCE"
         match = re.search(r'(?:is there a|do you see a|is there any|can you see a|can you see any)\s+([^?.!,]+)', question_lower)
         if match:
+            category = "PRESENCE"
             extracted = match.group(1).strip()
             words = extracted.split()
             stop_words = ["in", "on", "the", "at", "around", "behind"]
