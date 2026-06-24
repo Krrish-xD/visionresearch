@@ -4,7 +4,7 @@ import os
 from requests.exceptions import ConnectionError
 from .memory_utils import clear_memory
 
-def run_vlm_generation(z3_facts, rag_context, critical_question, detected_list=None, image_path=None, direct_vlm=False, mask_count=None, counting_target=None, presence_mode=False):
+def run_vlm_generation(z3_facts, rag_context, critical_question, detected_list=None, image_path=None, direct_vlm=False, mask_count=None, counting_target=None, presence_mode=False, location_mode=False):
     """
     Stage 5: Constrained Generation (VLM)
     Uses local Ollama API to answer the user's question based on proven facts.
@@ -17,7 +17,18 @@ def run_vlm_generation(z3_facts, rag_context, critical_question, detected_list=N
     z3_empty = not z3_facts or "No spatial relationships proven" in z3_facts
     rag_empty = not rag_context or "No relevant spatial context found" in rag_context
     
-    if presence_mode:
+    if location_mode and isinstance(counting_target, dict):
+        subject = counting_target.get("subject", "object")
+        if z3_facts and "PROVED" in z3_facts:
+            proofs = [p for p in z3_facts.split('\n') if "PROVED" in p and subject in p]
+            if proofs:
+                side = "RIGHT" if "RIGHT" in proofs[0] else "LEFT"
+                prompt = f"Mathematical detection PROVED the location. The {subject} was mathematically verified to be on the {side}. You must answer the user's question using ONLY this fact. Do not look at the image. Do not guess.\nQuestion: {critical_question}"
+            else:
+                prompt = f"Mathematical detection failed to find relative location of {subject}. Attempt best-effort visual analysis and mark as UNVERIFIED.\nQuestion: {critical_question}"
+        else:
+            prompt = f"Mathematical detection failed to find relative location of {subject}. Attempt best-effort visual analysis and mark as UNVERIFIED.\nQuestion: {critical_question}"
+    elif presence_mode:
         if mask_count > 0:
             prompt = f"Mathematical detection PROVED the existence of {counting_target}. Do not guess. Confirm you see the {counting_target}.\nQuestion: {critical_question}"
         else:

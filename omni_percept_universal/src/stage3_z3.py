@@ -5,7 +5,7 @@ import z3
 import cv2
 from .memory_utils import clear_memory
 
-def run_z3_prover(grounding_data, geometry_data, output_dir, question_category="GENERAL", relevant_objects=None):
+def run_z3_prover(grounding_data, geometry_data, output_dir, question_category="GENERAL", relevant_objects=None, location_targets=None):
     """
     Stage 3: Universal Z3 Theorem Proving
     Proves spatial relationships (distance, occlusion, facing) based on extracted features.
@@ -61,6 +61,50 @@ def run_z3_prover(grounding_data, geometry_data, output_dir, question_category="
                             proofs.append(f"[Z3] PROVED: {label} is facing RIGHT (Vector derived from {source} mask: x = {vec_x:.2f}).")
                 solver.reset()
                 
+    elif question_category == "RELATIVE_LOCATION" and location_targets:
+        subject = location_targets["subject"]
+        reference = location_targets["reference"]
+        
+        obj_sub = next((g for g in geometry_data if subject.lower() in g['label'].lower()), None)
+        obj_ref = next((g for g in geometry_data if reference.lower() in g['label'].lower()), None)
+        
+        if obj_sub:
+            x_sub = obj_sub["centroid_3d"][0]
+            label_sub = f"{obj_sub['label']}_{obj_sub['id']}"
+            
+            subject_on_left = z3.Bool(f'{label_sub}_on_left')
+            subject_on_right = z3.Bool(f'{label_sub}_on_right')
+            
+            if obj_ref:
+                x_ref = obj_ref["centroid_3d"][0]
+                label_ref = f"{obj_ref['label']}_{obj_ref['id']}"
+                
+                solver.add(subject_on_left == (x_sub < x_ref))
+                solver.add(subject_on_right == (x_sub > x_ref))
+                
+                if solver.check() == z3.sat:
+                    model = solver.model()
+                    if z3.is_true(model[subject_on_left]):
+                        proofs.append(f"[Z3] PROVED: {subject} is on the LEFT of the {reference} (Subject X: {x_sub:.2f} < Reference X: {x_ref:.2f})")
+                    elif z3.is_true(model[subject_on_right]):
+                        proofs.append(f"[Z3] PROVED: {subject} is on the RIGHT of the {reference} (Subject X: {x_sub:.2f} > Reference X: {x_ref:.2f})")
+            else:
+                obj_sub_ground = next((g for g in grounding_data if g['id'] == obj_sub['id']), None)
+                x_ref = 512
+                if obj_sub_ground and obj_sub_ground.get("mask_path") and os.path.exists(obj_sub_ground["mask_path"]):
+                    mask = np.load(obj_sub_ground["mask_path"])
+                    x_ref = mask.shape[1] / 2.0
+                
+                solver.add(subject_on_left == (x_sub < x_ref))
+                solver.add(subject_on_right == (x_sub > x_ref))
+                
+                if solver.check() == z3.sat:
+                    model = solver.model()
+                    if z3.is_true(model[subject_on_left]):
+                        proofs.append(f"[Z3] PROVED: {subject} is on the LEFT of the image center (Subject X: {x_sub:.2f} < Center X: {x_ref:.2f})")
+                    elif z3.is_true(model[subject_on_right]):
+                        proofs.append(f"[Z3] PROVED: {subject} is on the RIGHT of the image center (Subject X: {x_sub:.2f} > Center X: {x_ref:.2f})")
+            solver.reset()
     for i in range(len(geometry_data)):
         for j in range(len(geometry_data)):
             if i == j:

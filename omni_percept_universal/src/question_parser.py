@@ -40,6 +40,23 @@ def parse_question_type(question, detected_objects=None):
                     break
                 filtered.append(w)
             target_noun = " ".join(filtered) if filtered else words[0]
+    elif any(w in question_lower for w in ["on the left", "on the right", "left side", "right side", "left or right", "right or left"]):
+        category = "RELATIVE_LOCATION"
+        subject = "object"
+        reference = "main object"
+        match_sub = re.search(r'(?:is the|are the|does the)\s+(.+?)\s+(?:on the left|on the right|left side|right side|left or right|right or left)', question_lower)
+        if match_sub:
+            raw_sub = match_sub.group(1).strip()
+            subject = " ".join([w for w in raw_sub.split() if not w.endswith("'s") and not w.endswith("’s")])
+            if not subject: subject = raw_sub
+            
+        match_ref = re.search(r'(?:of the|of)\s+([^?.!,]+)', question_lower)
+        if match_ref:
+            raw_ref = match_ref.group(1).strip()
+            reference = " ".join([w for w in raw_ref.split() if not w.endswith("'s") and not w.endswith("’s")])
+            if not reference: reference = raw_ref
+            
+        target_noun = {"subject": subject, "reference": reference}
     elif any(w in question_lower for w in ["color", "what kind", "material", "texture", "breed", "type"]):
         category = "ATTRIBUTE"
     elif any(w in question_lower for w in ["facing left", "facing right", "point left", "point right", "pointing"]):

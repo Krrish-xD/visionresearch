@@ -77,7 +77,10 @@ def execute_pipeline(image_path, critical_question):
 
     # STAGE 1: Grounding & Masking
     yield (gr.update(), "Stage 1: Grounding & Masking running...", gr.update(), "Stage 1 in progress...")
-    annotated_img_path, json_path, grounding_data = run_grounding_and_masking(image_path, output_dir)
+    if category == "RELATIVE_LOCATION":
+        annotated_img_path, json_path, grounding_data = run_grounding_and_masking(image_path, output_dir, location_targets=target_noun)
+    else:
+        annotated_img_path, json_path, grounding_data = run_grounding_and_masking(image_path, output_dir)
     clear_memory()
     
     if not grounding_data:
@@ -90,7 +93,7 @@ def execute_pipeline(image_path, critical_question):
         return
         
     # Re-extract objects now that grounding_data is available
-    _, relevant_objects, _ = parse_question_type(critical_question, grounding_data)
+    _, relevant_objects, target_noun_re = parse_question_type(critical_question, grounding_data)
         
     # STAGE 2: Geometry Extraction
     yield (
@@ -109,7 +112,8 @@ def execute_pipeline(image_path, critical_question):
         gr.update(), 
         "Stage 3 in progress..."
     )
-    z3_facts = run_z3_prover(grounding_data, geometry_data, output_dir, category, relevant_objects)
+    location_targets = target_noun_re if category == "RELATIVE_LOCATION" else None
+    z3_facts = run_z3_prover(grounding_data, geometry_data, output_dir, category, relevant_objects, location_targets=location_targets)
     clear_memory()
     
     # STAGE 4: Local RAG
@@ -130,7 +134,15 @@ def execute_pipeline(image_path, critical_question):
         "Stage 5: Constrained Generation running..."
     )
     detected_list = [obj['label'] for obj in grounding_data]
-    final_report = run_vlm_generation(z3_facts, rag_context, critical_question, detected_list, image_path)
+    final_report = run_vlm_generation(
+        z3_facts, 
+        rag_context, 
+        critical_question, 
+        detected_list, 
+        image_path, 
+        location_mode=(category == "RELATIVE_LOCATION"), 
+        counting_target=target_noun_re
+    )
     clear_memory()
     
     # Final Output

@@ -8,7 +8,7 @@ from ultralytics import YOLO, FastSAM
 import cv2
 from .memory_utils import clear_memory
 
-def run_grounding_and_masking(image_path, output_dir, counting_target=None):
+def run_grounding_and_masking(image_path, output_dir, counting_target=None, location_targets=None):
     """
     Stage 1: Open-Vocabulary Grounding & Masking
     Finds objects autonomously using Florence-2, performs foveal part-segmentation, generates masks, and annotates the image.
@@ -19,6 +19,8 @@ def run_grounding_and_masking(image_path, output_dir, counting_target=None):
     detections = None
     if counting_target:
         classes = [counting_target]
+    elif location_targets:
+        classes = [location_targets["subject"], location_targets["reference"]]
     else:
         DEFAULT_CLASSES = "person, dog, cat, car, truck, tree, plant, flower, grass, ball, animal, bird, bicycle, building"
         classes = [cls.strip() for cls in DEFAULT_CLASSES.split(",")]
@@ -37,7 +39,12 @@ def run_grounding_and_masking(image_path, output_dir, counting_target=None):
         orig_image = Image.open(image_path).convert("RGB")
         
         # --- Pass 1: Global Detection (Multi-Scale Fallback) ---
-        task_prompt = "<OD>"
+        if location_targets:
+            task_prompt = "<CAPTION_TO_PHRASE_GROUNDING>"
+            prompt_input = f"<CAPTION_TO_PHRASE_GROUNDING>{location_targets['subject']}, {location_targets['reference']}"
+        else:
+            task_prompt = "<OD>"
+            prompt_input = task_prompt
             
         scales = [1.0, 0.75, 0.5, 0.35]
         found_bboxes = False
@@ -53,7 +60,7 @@ def run_grounding_and_masking(image_path, output_dir, counting_target=None):
                 new_h = int(orig_image.height * scale)
                 scaled_image = orig_image.resize((new_w, new_h))
                 
-            inputs = processor(text=task_prompt, images=scaled_image, return_tensors="pt").to(device)
+            inputs = processor(text=prompt_input, images=scaled_image, return_tensors="pt").to(device)
             with torch.no_grad():
                 generated_ids = model.generate(
                     input_ids=inputs["input_ids"],
@@ -179,12 +186,8 @@ def run_grounding_and_masking(image_path, output_dir, counting_target=None):
                                 break
                         
                         if not part_prompt:
-                            non_living_keywords = ["mirror", "wheel", "window", "door", "light", "reflector", "wiper", "bumper", "tire", "plate", "windshield", "engine", "seat", "handle", "sign", "tree", "plant", "flower", "grass", "road", "sky", "building", "house", "wall", "fence", "pole", "wire"]
-                            if any(kw in main_label for kw in non_living_keywords):
-                                part_prompt = None
-                            else:
-                                part_prompt = "nose, eyes, head"
-                                
+                            part_prompt = None
+                            
                         if part_prompt and "head" not in part_prompt and not any(v in main_label for v in ["bus", "car", "truck", "vehicle", "van", "train", "plane"]):
                             part_prompt += ", head"
                             
