@@ -53,8 +53,11 @@ Here are mathematically proven facts:
 Here is spatial context: 
 {rag_context}
 
-Note: Spatial orientation was mathematically verified by calculating the directional vector from the subject's eyes to its nose (Snout-Vector), ensuring accurate gaze direction regardless of body pose.
-Answer the user's critical question using ONLY these facts. Do not hallucinate.
+Instructions:
+- Answer the user's critical question using ONLY the provided mathematically proven facts.
+- Do not use terms like "major axis vector" or "aligns with" unless they explicitly appear in the provided facts.
+- Base your reasoning strictly on the text inside the [Z3] PROVED statements.
+- Do not hallucinate any other information.
 
 Critical Question: {critical_question}
 """

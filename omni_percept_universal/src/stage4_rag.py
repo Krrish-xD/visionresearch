@@ -20,7 +20,7 @@ def run_rag_retrieval(z3_facts, output_dir):
     
     # Hardcode 3 mock chunks
     documents = [
-        "When Object A's major axis vector aligns with the vector to Object B, A is considered 'facing' B.",
+        "When an object's orientation is determined by a Snout-Vector (eyes to nose) or Vehicle-Vector (front/rear parts to body), the spatial direction is mathematically proven by the relative coordinates of those specific parts.",
         "If Object A and B intersect in 2D space, but A's depth value is lower than B's, A is physically occluding B.",
         "The relative Euclidean distance between 3D centroids determines spatial proximity in the metric space."
     ]

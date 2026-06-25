@@ -243,8 +243,12 @@ def run_grounding_and_masking(image_path, output_dir, counting_target=None, loca
                 print(f"[Stage 1] Found {len(detections)} objects. Running foveal crop part-detection...")
                 
                 parts_map_vocab = {
+                    "person": "nose, eyes", "man": "nose, eyes", "woman": "nose, eyes", 
+                    "boy": "nose, eyes", "girl": "nose, eyes",
                     "dog": "nose, eyes", "cat": "nose, eyes", "eagle": "nose, eyes", "bird": "nose, eyes",
-                    "truck": "door, wheel, window", "car": "door, wheel, window", "bus": "door, wheel, window"
+                    "truck": "headlight, taillight, license plate, front grille", 
+                    "car": "headlight, taillight, license plate, front grille", 
+                    "bus": "headlight, taillight, license plate, front grille"
                 }
                 
                 for idx, box in enumerate(xyxy):
@@ -271,7 +275,7 @@ def run_grounding_and_masking(image_path, output_dir, counting_target=None, loca
                             part_prompt += ", head"
                             
                         if not part_prompt:
-                            print(f"[Stage 1] Skipping part-detection for '{main_label}' (Non-living or no parts specified).")
+                            print(f"[Stage 1] Skipping part-detection for '{main_label}' (No specific parts mapped for this object).")
                             continue
                             
                         part_prompt_full = f"<CAPTION_TO_PHRASE_GROUNDING> {part_prompt}"

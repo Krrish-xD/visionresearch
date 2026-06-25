@@ -40,7 +40,7 @@ def parse_question_type(question, detected_objects=None):
                     break
                 filtered.append(w)
             target_noun = " ".join(filtered) if filtered else words[0]
-    elif any(w in question_lower for w in ["facing left", "facing right", "point left", "point right", "pointing"]):
+    elif any(w in question_lower for w in ["facing left", "facing right", "point left", "point right", "pointing", "facing the camera", "facing away", "facing forward", "facing back", "facing the viewer"]):
         category = "ABSOLUTE_ORIENTATION"
     elif "facing" in question_lower or "look at" in question_lower or "looking at" in question_lower:
         category = "RELATIVE_ORIENTATION"

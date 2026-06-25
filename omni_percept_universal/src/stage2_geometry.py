@@ -93,6 +93,35 @@ def run_geometry_extraction(image_path, grounding_data, output_dir):
             
             orientation_vector = (float(v_x), float(v_y))
             orientation_source = "snout_vector"
+        elif any(p.get("label", "").lower() in ["headlight", "grille", "front grille"] for p in parts):
+            front_part = next((p for p in parts if p.get("label", "").lower() in ["headlight", "grille", "front grille"]), None)
+            bx1, by1, bx2, by2 = obj["bbox_xyxy"] # Body bbox
+            c_body_x = (bx1 + bx2) / 2.0
+            c_body_y = (by1 + by2) / 2.0
+            
+            fx1, fy1, fx2, fy2 = front_part["bbox_xyxy"]
+            c_front_x = (fx1 + fx2) / 2.0
+            c_front_y = (fy1 + fy2) / 2.0
+            
+            v_x = c_front_x - c_body_x
+            v_y = c_front_y - c_body_y
+            orientation_vector = (float(v_x), float(v_y))
+            orientation_source = "vehicle_front_vector"
+            
+        elif any(p.get("label", "").lower() in ["taillight", "license plate"] for p in parts):
+            rear_part = next((p for p in parts if p.get("label", "").lower() in ["taillight", "license plate"]), None)
+            bx1, by1, bx2, by2 = obj["bbox_xyxy"]
+            c_body_x = (bx1 + bx2) / 2.0
+            c_body_y = (by1 + by2) / 2.0
+            
+            rx1, ry1, rx2, ry2 = rear_part["bbox_xyxy"]
+            c_rear_x = (rx1 + rx2) / 2.0
+            c_rear_y = (ry1 + ry2) / 2.0
+            
+            v_x = c_rear_x - c_body_x
+            v_y = c_rear_y - c_body_y
+            orientation_vector = (float(v_x), float(v_y))
+            orientation_source = "vehicle_rear_vector"
         else:
             # Fallback to mask-based orientation
             orientation_mask_uint8 = mask_uint8

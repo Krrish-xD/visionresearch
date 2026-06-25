@@ -31,6 +31,7 @@ def run_z3_prover(grounding_data, geometry_data, output_dir, question_category="
                 facing_left = z3.Bool(f'{label}_facing_left')
                 facing_right = z3.Bool(f'{label}_facing_right')
                 facing_camera = z3.Bool(f'{label}_facing_camera')
+                facing_away = z3.Bool(f'{label}_facing_away')
                 
                 if source == "snout_vector":
                     solver.add(facing_left == (vec_x < -5))
@@ -45,6 +46,32 @@ def run_z3_prover(grounding_data, geometry_data, output_dir, question_category="
                             proofs.append(f"[Z3] PROVED: {label} is facing RIGHT (Nose is right of eyes: Vx = {vec_x:.2f})")
                         elif z3.is_true(model[facing_camera]):
                             proofs.append(f"[Z3] PROVED: {label} is facing CAMERA (Nose aligns with eyes: Vx = {vec_x:.2f})")
+                elif source == "vehicle_front_vector":
+                    solver.add(facing_left == (vec_x < -5))
+                    solver.add(facing_right == (vec_x > 5))
+                    solver.add(facing_camera == (vec_x >= -5 and vec_x <= 5))
+                    
+                    if solver.check() == z3.sat:
+                        model = solver.model()
+                        if z3.is_true(model[facing_left]):
+                            proofs.append(f"[Z3] PROVED: {label} is facing LEFT (Front headlight is left of body: Vx = {vec_x:.2f})")
+                        elif z3.is_true(model[facing_right]):
+                            proofs.append(f"[Z3] PROVED: {label} is facing RIGHT (Front headlight is right of body: Vx = {vec_x:.2f})")
+                        elif z3.is_true(model[facing_camera]):
+                            proofs.append(f"[Z3] PROVED: {label} is facing CAMERA (Front headlight is centered on body: Vx = {vec_x:.2f})")
+                elif source == "vehicle_rear_vector":
+                    solver.add(facing_left == (vec_x > 5))
+                    solver.add(facing_right == (vec_x < -5))
+                    solver.add(facing_away == (vec_x >= -5 and vec_x <= 5))
+                    
+                    if solver.check() == z3.sat:
+                        model = solver.model()
+                        if z3.is_true(model[facing_left]):
+                            proofs.append(f"[Z3] PROVED: {label} is facing LEFT (Taillight is right of body: Vx = {vec_x:.2f})")
+                        elif z3.is_true(model[facing_right]):
+                            proofs.append(f"[Z3] PROVED: {label} is facing RIGHT (Taillight is left of body: Vx = {vec_x:.2f})")
+                        elif z3.is_true(model[facing_away]):
+                            proofs.append(f"[Z3] PROVED: {label} is facing AWAY (Taillight/license plate is centered on body: Vx = {vec_x:.2f})")
                 else:
                     if vec_x < 0:
                         solver.add(facing_left == True)
@@ -190,7 +217,9 @@ def run_z3_prover(grounding_data, geometry_data, output_dir, question_category="
                     
                 if z3.is_true(model[facing_var]):
                     source_a = obj_a_geom.get("orientation_source", "body")
-                    proofs.append(f"[Z3] PROVED: {label_a} is oriented towards/aligns with {label_b} (Vector derived from {source_a} mask).")
+                    # Only generate this generic proof if we don't have a specific vector already
+                    if source_a not in ["snout_vector", "vehicle_front_vector", "vehicle_rear_vector"]:
+                        proofs.append(f"[Z3] PROVED: {label_a} is oriented towards/aligns with {label_b} (Vector derived from {source_a} mask).")
                     
             # Reset for clean slate next iteration
             solver.reset()
