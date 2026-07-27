@@ -23,3 +23,12 @@ temp/
 .vscode/
 .idea/
 .DS_Store
+*.safetensors
+*.bin
+models/
+weights/
+frontend/node_modules
+backend/outputs
+backend/uploads
+
+omni_percept_universal/*.pyc

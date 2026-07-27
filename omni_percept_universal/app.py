@@ -1,7 +1,7 @@
 import gradio as gr
 from pipeline_runner import execute_pipeline
 
-with gr.Blocks(theme=gr.themes.Soft(), title="Omni-Percept Universal Pipeline") as app:
+with gr.Blocks(title="Omni-Percept Universal Pipeline") as app:
     gr.Markdown("# 👁️ Omni-Percept Universal Pipeline")
     gr.Markdown("Defense-grade, memory-safe, neuro-symbolic Vision Proof-of-Concept.")
     
@@ -35,4 +35,4 @@ with gr.Blocks(theme=gr.themes.Soft(), title="Omni-Percept Universal Pipeline") 
 if __name__ == "__main__":
     import os
     output_dir = os.path.join(os.path.dirname(__file__), "data", "temp")
-    app.launch(share=False, allowed_paths=[output_dir])
+    app.launch(share=False, allowed_paths=[output_dir], theme=gr.themes.Soft())
