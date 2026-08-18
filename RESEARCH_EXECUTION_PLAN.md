@@ -116,7 +116,7 @@ The primary comparison is `raw_confidence` vs each calibrated condition.
 
 Start with one primary modern model, then add one stable baseline family for comparison.
 
-1. `Qwen/Qwen2.5-VL-7B-Instruct` as the primary model for the main paper.
+1. `OpenGVLab/InternVL3-8B` as the primary model for the main paper.
 2. `llava-hf/llava-1.5-7b-hf` as the stable baseline for reproducibility and hardware accessibility.
 3. If hardware and dependency stability allow, replace or supplement the LLaVA baseline with a LLaVA-NeXT checkpoint such as `llava-hf/llava-v1.6-mistral-7b-hf`.
 
@@ -126,7 +126,7 @@ Do not use Ollama for the main experiments. Ollama is useful for chatting with l
 
 Important compatibility note:
 
-- `Qwen2.5-VL` is newer and better aligned with a 2026 submission, but it may require the latest Hugging Face `transformers` support. Confirm the model loads cleanly before freezing the environment for the team.
+- `InternVL3` requires `trust_remote_code=True` and is optimized for visual grounding tasks with improved reasoning capabilities. Confirm the model loads cleanly before freezing the environment for the team.
 - `LLaVA-1.5` is older, but it remains useful as a strong reproducible baseline because the tooling is mature and many peers can run it locally.
 
 ### Datasets
