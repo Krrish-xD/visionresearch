@@ -1,0 +1,34 @@
+# Python virtual environments
+venv/
+.venv/
+env/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Model weights and large binaries
+*.pt
+*.pth
+*.onnx
+
+# Data and Temp directories
+data/temp/
+temp/
+*.log
+
+# IDE and OS files
+.vscode/
+.idea/
+.DS_Store
+*.safetensors
+*.bin
+models/
+weights/
+frontend/node_modules
+backend/outputs
+backend/uploads
+
+omni_percept_universal/*.pyc
