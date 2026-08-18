@@ -114,14 +114,20 @@ The primary comparison is `raw_confidence` vs each calibrated condition.
 
 ### Models
 
-Start with one model, then scale to two.
+Start with one primary modern model, then add one stable baseline family for comparison.
 
-1. `llava-hf/llava-1.5-7b-hf`
-2. `Qwen/Qwen2-VL-7B-Instruct` or the smallest Qwen2-VL variant that exposes logits cleanly through Transformers
+1. `Qwen/Qwen2.5-VL-7B-Instruct` as the primary model for the main paper.
+2. `llava-hf/llava-1.5-7b-hf` as the stable baseline for reproducibility and hardware accessibility.
+3. If hardware and dependency stability allow, replace or supplement the LLaVA baseline with a LLaVA-NeXT checkpoint such as `llava-hf/llava-v1.6-mistral-7b-hf`.
 
 Do not use proprietary APIs for the main result because you need token logits and reproducibility.
 
 Do not use Ollama for the main experiments. Ollama is useful for chatting with local models, but it does not reliably expose the token-level logits needed for calibration. Run VLMs directly through Hugging Face Transformers with `return_dict_in_generate=True` and `output_scores=True`.
+
+Important compatibility note:
+
+- `Qwen2.5-VL` is newer and better aligned with a 2026 submission, but it may require the latest Hugging Face `transformers` support. Confirm the model loads cleanly before freezing the environment for the team.
+- `LLaVA-1.5` is older, but it remains useful as a strong reproducible baseline because the tooling is mature and many peers can run it locally.
 
 ### Datasets
 
@@ -467,7 +473,8 @@ Success check:
 
 Deliverables:
 
-- LLaVA inference script
+- Qwen2.5-VL inference script
+- one baseline inference script from the LLaVA family
 - confidence extraction
 - raw prediction cache
 - answer normalization
@@ -584,9 +591,9 @@ Target final workflow:
 ```bash
 python -m src.datasets.prepare --config configs/experiment.yaml
 python -m src.evaluation.make_splits --config configs/experiment.yaml
-python -m src.vlm.inference --config configs/experiment.yaml --model llava-1.5-7b
-python -m src.calibration.fit --config configs/experiment.yaml --model llava-1.5-7b
-python -m src.evaluation.run_experiment --config configs/experiment.yaml --model llava-1.5-7b
+python -m src.vlm.inference --config configs/experiment.yaml --model qwen2.5-vl-7b
+python -m src.calibration.fit --config configs/experiment.yaml --model qwen2.5-vl-7b
+python -m src.evaluation.run_experiment --config configs/experiment.yaml --model qwen2.5-vl-7b
 python -m src.evaluation.tables --results results/metrics/main.csv
 python -m src.evaluation.plots --results results/metrics/main.csv
 ```
@@ -740,3 +747,5 @@ Before submission, every answer must be yes:
 - GQA official dataset page: https://cs.stanford.edu/people/dorarad/gqa/
 - LLaVA 1.5 model card: https://huggingface.co/llava-hf/llava-1.5-7b-hf
 - Qwen2-VL record: https://dblp.org/rec/journals/corr/abs-2409-12191
+- Qwen2.5-VL model card: https://huggingface.co/Qwen/Qwen2.5-VL-7B-Instruct
+- LLaVA-NeXT documentation: https://huggingface.co/docs/transformers/main/model_doc/llava_next
