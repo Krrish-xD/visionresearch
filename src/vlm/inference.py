@@ -9,7 +9,6 @@ import torch
 import math
 from typing import Dict, Any, List, Optional
 from PIL import Image
-
 from transformers import AutoProcessor, AutoModelForCausalLM
 try:
     from transformers import LlavaForConditionalGeneration
@@ -212,7 +211,6 @@ def run_predictions_on_dataset(
 
     print(f"Saved {len(predictions)} predictions -> {out_file}")
     return out_file
-
 class VLMEngine:
     def __init__(self, weights_dir: str = "../weights"):
         self.weights_dir = weights_dir
@@ -355,7 +353,6 @@ class VLMEngine:
 
 # Global singleton instance for the backend to use
 vlm_engine = VLMEngine()
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run VLM inference on datasets")
     parser.add_argument("--dataset", default="mmvp", help="Dataset name")
