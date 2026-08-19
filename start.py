@@ -9,7 +9,14 @@ def main():
     backend_dir = os.path.join(root_dir, "backend")
     frontend_dir = os.path.join(root_dir, "frontend")
 
-    print("Starting Sahara Research Visualizer...")
+    # Automatically use the virtual environment's python if it exists
+    venv_python = os.path.join(root_dir, "venv", "bin", "python")
+    if os.name == 'nt':
+        venv_python = os.path.join(root_dir, "venv", "Scripts", "python.exe")
+    
+    python_executable = venv_python if os.path.exists(venv_python) else sys.executable
+
+    print("Starting Vision Research Visualizer...")
 
     # Automatically run npm install if node_modules doesn't exist
     if not os.path.exists(os.path.join(frontend_dir, "node_modules")):
@@ -27,7 +34,7 @@ def main():
 
     print("-> Starting FastAPI backend (logging to backend_startup.log)...")
     backend_process = subprocess.Popen(
-        [sys.executable, "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"],
+        [python_executable, "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"],
         cwd=backend_dir,
         stdout=backend_log,
         stderr=subprocess.STDOUT
