@@ -1,0 +1,49 @@
+/* Custom classes (Tailwind CDN handles the rest natively) */
+.app-shadow {
+  box-shadow: 0 2px 16px rgba(58, 48, 42, 0.04);
+}
+.app-border {
+  border: 1px solid rgba(216, 208, 200, 0.6);
+}
+.token-high {
+  background-color: rgba(39, 174, 96, 0.15);
+  color: #1e8449;
+  border-color: rgba(39, 174, 96, 0.3);
+}
+.token-med {
+  background-color: rgba(241, 196, 15, 0.15);
+  color: #b7950b;
+  border-color: rgba(241, 196, 15, 0.3);
+}
+.token-low {
+  background-color: rgba(192, 57, 43, 0.1);
+  color: #922b21;
+  border-color: rgba(192, 57, 43, 0.3);
+}
+
+.token-item {
+  transition: all 0.2s ease;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.token-item:hover {
+  transform: scale(1.05);
+  border-color: currentColor;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #d8d0c8;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #c2652a;
+}
