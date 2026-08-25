@@ -9,10 +9,25 @@ def main():
     backend_dir = os.path.join(root_dir, "backend")
     frontend_dir = os.path.join(root_dir, "frontend")
 
-    # Automatically use the virtual environment's python if it exists
-    venv_python = os.path.join(root_dir, "venv", "bin", "python")
+    # Create virtual environment if it doesn't exist
+    venv_dir = os.path.join(root_dir, "venv")
+    if not os.path.exists(venv_dir):
+        print("-> venv not found. Creating virtual environment and installing dependencies... (this might take a moment)")
+        try:
+            subprocess.run([sys.executable, "-m", "venv", "venv"], cwd=root_dir, check=True)
+            venv_pip = os.path.join(venv_dir, "bin", "pip")
+            if os.name == 'nt':
+                venv_pip = os.path.join(venv_dir, "Scripts", "pip.exe")
+            subprocess.run([venv_pip, "install", "-r", "requirements.txt"], cwd=root_dir, check=True)
+            print("-> venv setup and pip install complete.")
+        except subprocess.CalledProcessError as e:
+            print(f"❌ Failed to setup virtual environment or install dependencies: {e}")
+            return
+
+    # Automatically use the virtual environment's python
+    venv_python = os.path.join(venv_dir, "bin", "python")
     if os.name == 'nt':
-        venv_python = os.path.join(root_dir, "venv", "Scripts", "python.exe")
+        venv_python = os.path.join(venv_dir, "Scripts", "python.exe")
     
     python_executable = venv_python if os.path.exists(venv_python) else sys.executable
 
