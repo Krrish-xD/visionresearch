@@ -8,9 +8,9 @@ Reproducible empirical evaluation testing whether post-hoc calibration of Vision
 
 - **Python**: 3.11.x (managed via `uv`)
 - **GPU**: NVIDIA RTX 2000 Ada Generation (16 GB VRAM, CUDA 12.x)
-- **Virtual Environment**: `.venv`
+- **Virtual Environment**: `venv`
 
-To re-create or activate the environment:
+To setup the virtual environment, install dependencies, and launch the Backend + Web UI servers:
 ```bash
 python start.py
 ```
@@ -29,9 +29,9 @@ python -m src.datasets.prepare --config configs/experiment.yaml
 python -m src.evaluation.make_splits --config configs/experiment.yaml
 ```
 
-### 3. Run Unit Tests (17 tests)
+### 3. Run Unit Tests (139 tests)
 ```bash
-python -m unittest discover -s tests -p "test_*.py" -v
+venv/bin/pytest tests/ -v
 ```
 
 ### 4. Run Experiment Pipeline
@@ -66,6 +66,8 @@ python -m src.evaluation.run_experiment --config configs/experiment.yaml --datas
 
 ```text
 visionresearch/
+├── backend/                 # FastAPI application, REST endpoints, and router modules
+├── frontend/                # Vite/React Web UI
 ├── configs/
 │   ├── experiment.yaml          # Dataset paths, split ratios, seeds, solver timeouts
 │   └── models.yaml              # Model IDs, quantization settings, prompt templates
@@ -75,10 +77,10 @@ visionresearch/
 │   └── splits/                  # Stratified 40/60 splits
 ├── src/
 │   ├── datasets/                # MMVP, CLEVR, GQA loaders and standardizers
-│   ├── vlm/                     # VLM inference, prompts, and token confidence extraction
+│   ├── vlm/                     # VLM model engine (engine.py), evaluation script (evaluate.py), pipeline utilities
 │   ├── formalization/           # JSON schemas, deterministic parser, and validators
 │   ├── solver/                  # Z3 AST encoder, MaxSMT verifier, SFAR diagnostics
 │   ├── calibration/             # Temperature scaling, Isotonic, Conformal risk & ECE metrics
 │   └── evaluation/              # Experiment runner, statistical tests, tables & plots
-└── tests/                       # Unit test suite covering all modules
+└── tests/                       # Pytest suite covering all modules (139 tests)
 ```
