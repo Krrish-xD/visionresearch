@@ -12,9 +12,7 @@ Reproducible empirical evaluation testing whether post-hoc calibration of Vision
 
 To re-create or activate the environment:
 ```bash
-uv venv .venv --python 3.11
-.venv\Scripts\activate
-uv pip install -r requirements.txt
+python start.py
 ```
 
 ---
