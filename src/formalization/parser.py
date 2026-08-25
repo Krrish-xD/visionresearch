@@ -85,7 +85,7 @@ def parse_vlm_answer_to_claim(
     """
     norm_text = normalize_text(raw_answer)
     subject = "target_object"
-    if gold_facts and len(gold_facts) > 0:
+    if gold_facts and len(gold_facts) > 0 and isinstance(gold_facts[0], dict):
         ref_fact = gold_facts[0]
         subject = ref_fact.get("subject", subject)
     elif question:
@@ -109,16 +109,16 @@ def parse_vlm_answer_to_claim(
         if tokens:
             attr_val = tokens[0]
             attr_type = "property"
-            if gold_facts and len(gold_facts) > 0 and "attribute_type" in gold_facts[0]:
+            if gold_facts and len(gold_facts) > 0 and isinstance(gold_facts[0], dict) and "attribute_type" in gold_facts[0]:
                 attr_type = gold_facts[0]["attribute_type"]
             return {"predicate": "attribute", "subject": subject, "attribute_type": attr_type, "value": attr_val}, attr_val, "success"
         return None, norm_text, "failed"
 
-    elif answer_type == "choice":
+    elif answer_type == "choice" or (options and parse_choice_letter(raw_answer) is not None):
         letter = parse_choice_letter(raw_answer)
         if letter is not None:
             # Map choice letter to claim if gold facts are structured
-            if gold_facts and len(gold_facts) > 0:
+            if gold_facts and len(gold_facts) > 0 and isinstance(gold_facts[0], dict):
                 gold_fact = gold_facts[0]
                 # If letter matches gold or differs, determine value
                 return {
@@ -135,7 +135,7 @@ def parse_vlm_answer_to_claim(
         for rel in ["left", "right", "above", "below", "front", "behind", "next_to", "inside"]:
             if rel in norm_text:
                 obj_b = "reference_object"
-                if gold_facts and len(gold_facts) > 0:
+                if gold_facts and len(gold_facts) > 0 and isinstance(gold_facts[0], dict):
                     obj_b = gold_facts[0].get("object", obj_b)
                 return {"predicate": "relation", "subject": subject, "relation_type": rel, "object": obj_b}, rel, "success"
         return None, norm_text, "failed"

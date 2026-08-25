@@ -221,6 +221,7 @@ class TestGenerateEndpoint:
         )
         assert resp.status_code == 400
         assert "Invalid image format" in resp.json()["detail"]
+        engine.load_model.assert_not_called()
 
     def test_missing_model_id_field(self, mock_engine):
         """Omitting model_id should return a 422 validation error."""

@@ -44,6 +44,12 @@ async def generate_logprobs(
     top_k: int = Form(50),
     max_tokens: int = Form(100)
 ):
+    try:
+        image_bytes = await image.read()
+        pil_image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid image format: {str(e)}")
+
     # Resolve ID to path
     models = vlm_engine.list_available_models()
     model_path = next((m["path"] for m in models if m["id"] == model_id), model_id)
@@ -52,12 +58,6 @@ async def generate_logprobs(
         vlm_engine.load_model(model_path)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to load model: {str(e)}")
-
-    try:
-        image_bytes = await image.read()
-        pil_image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Invalid image format: {str(e)}")
 
     try:
         result = vlm_engine.generate_with_logprobs(

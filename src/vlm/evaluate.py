@@ -20,16 +20,24 @@ class VLMInferenceRunner:
     def __init__(self, model_key: str = "llava-1.5-7b", config_path: str = "configs/models.yaml"):
         self.model_key = model_key
         with open(config_path, "r", encoding="utf-8") as f:
-            self.model_configs = yaml.safe_load(f)["models"]
+            data = yaml.safe_load(f)
+            self.model_configs = data.get("models", {}) if isinstance(data, dict) else {}
 
-        self.cfg = self.model_configs.get(model_key, self.model_configs["llava-1.5-7b"])
+        if model_key in self.model_configs:
+            self.cfg = self.model_configs[model_key]
+        elif "llava-1.5-7b" in self.model_configs:
+            self.cfg = self.model_configs["llava-1.5-7b"]
+        elif self.model_configs:
+            self.cfg = next(iter(self.model_configs.values()))
+        else:
+            self.cfg = {}
         
         # Use the unified engine
         self.engine = VLMEngine()
 
     def load_model(self):
         """Load model and processor into VRAM using the unified engine."""
-        hf_id = self.cfg["hf_id"]
+        hf_id = self.cfg.get("hf_id", self.model_key)
         load_in_4bit = self.cfg.get("load_in_4bit", True)
         trust_remote = self.cfg.get("trust_remote_code", False)
         
@@ -83,7 +91,7 @@ class VLMInferenceRunner:
                     raw_ans = str((int(norm_gold) + 1) if norm_gold.isdigit() else 2)
                 elif ans_type == "yes_no":
                     raw_ans = "no" if norm_gold == "yes" else "yes"
-                elif ans_type == "choice":
+                elif ans_type == "choice" or options:
                     raw_ans = "(b)" if "(a)" in norm_gold else "(a)"
                 else:
                     raw_ans = "unknown"
@@ -168,5 +176,12 @@ if __name__ == "__main__":
     parser.add_argument("--model", default="llava-1.5-7b", help="Model key")
     parser.add_argument("--limit", type=int, default=None, help="Max items to infer")
     parser.add_argument("--mock", action="store_true", help="Run simulated inference")
+    parser.add_argument("--output_dir", default="results/raw_predictions", help="Output directory for predictions")
     args = parser.parse_args()
-    run_predictions_on_dataset(dataset_name=args.dataset, model_key=args.model, limit=args.limit, mock=args.mock)
+    run_predictions_on_dataset(
+        dataset_name=args.dataset,
+        model_key=args.model,
+        limit=args.limit,
+        mock=args.mock,
+        output_dir=args.output_dir
+    )

@@ -39,6 +39,26 @@ class VLMEngine:
                     models.append({"id": item, "path": full_path})
         return models
 
+    def unload_model(self):
+        """Safely unloads current model and processor, resetting state and clearing caches."""
+        if getattr(self, "model", None) is not None:
+            try:
+                del self.model
+            except AttributeError:
+                pass
+        if getattr(self, "processor", None) is not None:
+            try:
+                del self.processor
+            except AttributeError:
+                pass
+        self.model = None
+        self.processor = None
+        self.current_model_id = None
+        import gc
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
     def load_model(self, model_id_or_path: str, load_in_4bit: bool = True, trust_remote_code: bool = True):
         """Loads a model dynamically, unloading the previous one if necessary."""
         if self.current_model_id == model_id_or_path and self.model is not None:
@@ -47,58 +67,58 @@ class VLMEngine:
         print(f"Loading model {model_id_or_path}...")
         
         # Unload previous model to free VRAM
-        if self.model is not None:
-            del self.model
-            del self.processor
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
+        self.unload_model()
             
-        self.processor = AutoProcessor.from_pretrained(
-            model_id_or_path, 
-            trust_remote_code=trust_remote_code
-        )
-        
-        # Routing heuristic
-        model_lower = model_id_or_path.lower()
-        if "llava" in model_lower and LlavaForConditionalGeneration:
-            model_class = LlavaForConditionalGeneration
-        elif "qwen" in model_lower and Qwen2VLForConditionalGeneration:
-            model_class = Qwen2VLForConditionalGeneration
-        else:
-            model_class = AutoModelForCausalLM
-            
-        kwargs = {
-            "torch_dtype": torch.float16 if self.device == "cuda" else torch.float32,
-            "device_map": "auto" if self.device == "cuda" else None,
-            "trust_remote_code": trust_remote_code
-        }
-        
-        if load_in_4bit and self.device == "cuda":
-            try:
-                from transformers import BitsAndBytesConfig
-                kwargs["quantization_config"] = BitsAndBytesConfig(
-                    load_in_4bit=True,
-                    bnb_4bit_compute_dtype=torch.float16,
-                    bnb_4bit_use_double_quant=True,
-                    bnb_4bit_quant_type="nf4"
-                )
-            except ImportError:
-                pass
-
         try:
-            self.model = model_class.from_pretrained(model_id_or_path, **kwargs)
-        except Exception:
-            try:
-                if AutoModelForVision2Seq is not None:
-                    self.model = AutoModelForVision2Seq.from_pretrained(model_id_or_path, **kwargs)
-                else:
-                    raise RuntimeError("AutoModelForVision2Seq not available")
-            except Exception:
-                self.model = AutoModelForCausalLM.from_pretrained(model_id_or_path, **kwargs)
+            self.processor = AutoProcessor.from_pretrained(
+                model_id_or_path, 
+                trust_remote_code=trust_remote_code
+            )
             
-        self.model.eval()
-        self.current_model_id = model_id_or_path
-        print(f"Model {model_id_or_path} loaded successfully.")
+            # Routing heuristic
+            model_lower = model_id_or_path.lower()
+            if "llava" in model_lower and LlavaForConditionalGeneration:
+                model_class = LlavaForConditionalGeneration
+            elif "qwen" in model_lower and Qwen2VLForConditionalGeneration:
+                model_class = Qwen2VLForConditionalGeneration
+            else:
+                model_class = AutoModelForCausalLM
+                
+            kwargs = {
+                "torch_dtype": torch.float16 if self.device == "cuda" else torch.float32,
+                "device_map": "auto" if self.device == "cuda" else None,
+                "trust_remote_code": trust_remote_code
+            }
+            
+            if load_in_4bit and self.device == "cuda":
+                try:
+                    from transformers import BitsAndBytesConfig
+                    kwargs["quantization_config"] = BitsAndBytesConfig(
+                        load_in_4bit=True,
+                        bnb_4bit_compute_dtype=torch.float16,
+                        bnb_4bit_use_double_quant=True,
+                        bnb_4bit_quant_type="nf4"
+                    )
+                except ImportError:
+                    pass
+
+            try:
+                self.model = model_class.from_pretrained(model_id_or_path, **kwargs)
+            except Exception:
+                try:
+                    if AutoModelForVision2Seq is not None:
+                        self.model = AutoModelForVision2Seq.from_pretrained(model_id_or_path, **kwargs)
+                    else:
+                        raise RuntimeError("AutoModelForVision2Seq not available")
+                except Exception:
+                    self.model = AutoModelForCausalLM.from_pretrained(model_id_or_path, **kwargs)
+                
+            self.model.eval()
+            self.current_model_id = model_id_or_path
+            print(f"Model {model_id_or_path} loaded successfully.")
+        except Exception:
+            self.unload_model()
+            raise
 
     def generate_with_logprobs(self, pil_image, prompt_text: str, temperature: float = 1.0, top_p: float = 1.0, top_k: int = 50, max_tokens: int = 100):
         """Runs inference and extracts exact token logprobs."""
