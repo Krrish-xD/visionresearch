@@ -2,7 +2,7 @@
 
 from src.vlm.prompts import format_prompt
 from src.vlm.confidence import extract_token_confidence
-from src.vlm.inference import VLMInferenceRunner, run_predictions_on_dataset
+from src.vlm.evaluate import VLMInferenceRunner, run_predictions_on_dataset
 
 __all__ = [
     "format_prompt",

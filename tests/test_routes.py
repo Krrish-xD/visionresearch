@@ -23,6 +23,7 @@ def mock_engine():
     engine.current_model_id = None
     engine.processor = None
     
+    import src.api.routes
     with patch("src.api.routes.vlm_engine", engine):
         # Import app AFTER patching so the router binds to our mock
         import sys, os

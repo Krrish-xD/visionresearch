@@ -3,7 +3,7 @@ from PIL import Image
 import io
 import typing
 
-from src.vlm.inference import vlm_engine
+from src.vlm.server import vlm_engine
 from src.api.schemas import TokenLogprob, GenerationResponse, ModelInfo, ModelLoadRequest, ModelStatusResponse
 
 router = APIRouter(prefix="/api")

@@ -10,7 +10,7 @@ from typing import Dict, Any, List
 
 from src.datasets.prepare import prepare_all
 from src.evaluation.make_splits import make_all_splits
-from src.vlm.inference import run_predictions_on_dataset
+from src.vlm.evaluate import run_predictions_on_dataset
 from src.solver.verifier import check_hard_contradiction, verify_with_maxsmt
 from src.solver.diagnostics import compute_contradiction_metrics, compute_solve_time_stats
 from src.calibration.temperature import TemperatureScaling
