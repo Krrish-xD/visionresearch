@@ -1,0 +1,50 @@
+# Experiment Configuration
+# Calibrated Confidence for Symbolic Error Detection in Visual Grounding
+
+project:
+  name: "visionresearch"
+  seed: 42
+  device: "cuda"
+
+datasets:
+  mmvp:
+    enabled: true
+    source: "lmms-lab-eval/MMVP"
+    category_source: "MMVP/MMVP_VLM"
+    processed_path: "data/processed/mmvp.jsonl"
+  clevr:
+    enabled: true
+    subset_size: 1000
+    processed_path: "data/processed/clevr.jsonl"
+  gqa:
+    enabled: true
+    subset_size: 1000
+    processed_path: "data/processed/gqa.jsonl"
+
+splits:
+  calibration_ratio: 0.40
+  evaluation_ratio: 0.60
+  stratify_by: ["dataset", "category"]
+  splits_dir: "data/splits"
+
+solver:
+  timeout_ms: 10000
+  hard_oracle: true
+  maxsmt_conditions:
+    - "uniform_soft"
+    - "raw_confidence"
+    - "temperature_scaled"
+    - "isotonic"
+    - "conformal_risk"
+
+calibration:
+  ece_bins: [10, 15]
+  conformal_alpha: 0.10
+  conformal_min_weight: 0.05
+  min_isotonic_samples: 50
+
+output:
+  predictions_dir: "results/raw_predictions"
+  solver_outputs_dir: "results/solver_outputs"
+  metrics_dir: "results/metrics"
+  figures_dir: "results/figures"

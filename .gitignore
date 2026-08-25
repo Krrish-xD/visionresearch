@@ -8,27 +8,44 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+.pytest_cache/
 
 # Model weights and large binaries
 *.pt
 *.pth
 *.onnx
+*.safetensors
+*.bin
+models/
+weights/
 
-# Data and Temp directories
+# Data and Temp directories (keep repository lightweight on git clone)
+data/raw/
+data/processed/
 data/temp/
+data/downloads/
+data/cache/
+*.zip
+*.tar
+*.tar.gz
+*.7z
 temp/
 *.log
+results/
+
+# ChromaDB vector store
+chroma.sqlite3
+omni_percept_universal/data/db/
+
+# Frontend / Backend
+frontend/node_modules/
+frontend/dist/
+backend/outputs/
+backend/uploads/
 
 # IDE and OS files
 .vscode/
 .idea/
 .DS_Store
-*.safetensors
-*.bin
-models/
-weights/
-frontend/node_modules
-backend/outputs
-backend/uploads
+Thumbs.db
 
-omni_percept_universal/*.pyc

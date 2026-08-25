@@ -1,0 +1,48 @@
+# Model Configurations and Prompts
+
+models:
+  llava-1.5-7b:
+    hf_id: "llava-hf/llava-1.5-7b-hf"
+    family: "llava"
+    torch_dtype: "float16"
+    load_in_4bit: true
+    trust_remote_code: false
+    max_new_tokens: 16
+    temperature: 0.0
+
+  internvl3-8b:
+    hf_id: "OpenGVLab/InternVL3-8B"
+    family: "internvl"
+    torch_dtype: "bfloat16"
+    load_in_4bit: true
+    trust_remote_code: true
+    max_new_tokens: 16
+    temperature: 0.0
+
+  internvl3-1b:
+    hf_id: "OpenGVLab/InternVL3-1B"
+    family: "internvl"
+    torch_dtype: "bfloat16"
+    load_in_4bit: false
+    trust_remote_code: true
+    max_new_tokens: 16
+    temperature: 0.0
+
+  qwen2.5-vl-7b:
+    hf_id: "Qwen/Qwen2.5-VL-7B-Instruct"
+    family: "qwen"
+    torch_dtype: "bfloat16"
+    load_in_4bit: true
+    trust_remote_code: true
+    max_new_tokens: 16
+    temperature: 0.0
+
+prompts:
+  count:
+    instruction: "Answer with only one integer.\nQuestion: {question}"
+  yes_no:
+    instruction: "Answer with only yes or no.\nQuestion: {question}"
+  attribute:
+    instruction: "Answer with only the single attribute word.\nQuestion: {question}"
+  choice:
+    instruction: "Options: {options}\nAnswer with only the letter of the correct option, for example (a) or (b).\nQuestion: {question}"

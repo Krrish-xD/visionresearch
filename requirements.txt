@@ -1,58 +1,51 @@
 # Research environment for:
 # Calibrated Confidence for Symbolic Error Detection in Visual Grounding
 #
-# Recommended Python: 3.10 or 3.11
-#
-# Install order:
-# 1. Install PyTorch for your CUDA/CPU setup from https://pytorch.org/get-started/locally/
-# 2. Then run: pip install -r requirements.txt
-#
-# Example CUDA install (check the official PyTorch page before using):
-# pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu126
-#
-# Example CPU install:
-# pip install torch torchvision torchaudio
+# Python: 3.11
+# GPU: CUDA 12.x supported (NVIDIA RTX series)
 
-# Core VLM and Hugging Face stack
-transformers>=5.14.1,<6.0
-accelerate>=1.14.0,<2.0
-datasets>=5.0.0,<6.0
-huggingface-hub>=0.34.4,<1.0
-safetensors>=0.6.2,<1.0
-tokenizers>=0.22.0,<0.23
-sentencepiece>=0.2.2,<0.3
-bitsandbytes>=0.50.0,<0.51
-peft>=0.19.1,<0.20
-einops>=0.8.1,<0.9
+# Core Deep Learning and VLM Stack
+torch>=2.1.0
+torchvision>=0.16.0
+torchaudio>=2.1.0
+transformers>=4.40.0
+accelerate>=0.30.0
+datasets>=3.0.0
+huggingface-hub>=0.25.0
+safetensors>=0.4.0
+tokenizers>=0.19.0
+sentencepiece>=0.2.0
+bitsandbytes>=0.43.0
+peft>=0.11.0
+einops>=0.8.0
 
-# Solver and calibration
-z3-solver>=4.15.3.0,<5.0
-netcal>=1.4.0,<2.0
-scikit-learn>=1.7.1,<2.0
-statsmodels>=0.14.5,<1.0
-scipy>=1.16.1,<2.0
+# Symbolic Solver and Calibration Framework
+z3-solver>=4.12.0
+netcal>=1.3.0
+scikit-learn>=1.4.0
+statsmodels>=0.14.0
+scipy>=1.12.0
 
-# Data and experiment handling
-numpy>=2.3.2,<3.0
-pandas>=2.3.1,<3.0
-pyarrow>=21.0.0,<22.0
-pyyaml>=6.0.2,<7.0
-tqdm>=4.67.1,<5.0
-jsonschema>=4.25.1,<5.0
+# Data and Experiment Handling
+numpy>=1.26.0
+pandas>=2.2.0
+pyarrow>=15.0.0
+pyyaml>=6.0.0
+tqdm>=4.66.0
+jsonschema>=4.20.0
 
-# Vision and image utilities
-pillow>=11.3.0,<12.0
-opencv-python>=4.12.0.88,<5.0
+# Vision and Image Utilities
+pillow>=10.0.0
+opencv-python>=4.8.0
 
-# Plotting and notebooks
-matplotlib>=3.10.5,<4.0
-seaborn>=0.13.2,<0.14
-jupyterlab>=4.4.6,<5.0
-ipykernel>=6.30.1,<7.0
-
-# Evaluation and utilities
-evaluate>=0.4.5,<0.5
-tabulate>=0.9.0,<1.0
-rich>=14.1.0,<15.0
-python-dotenv>=1.1.1,<2.0
-requests>=2.32.4,<3.0
+# Plotting, Evaluation, and Reporting
+matplotlib>=3.8.0
+seaborn>=0.13.0
+evaluate>=0.4.0
+tabulate>=0.9.0
+rich>=13.0.0
+python-dotenv>=1.0.0
+requests>=2.31.0
+pytest>=8.0.0
+jupyterlab>=4.0.0
+ipykernel>=6.29.0
