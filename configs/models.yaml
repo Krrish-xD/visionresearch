@@ -2,7 +2,7 @@
 
 models:
   llava-1.5-7b:
-    hf_id: "llava-hf/llava-1.5-7b-hf"
+    hf_id: "models/llava-1.5-7b-hf"
     family: "llava"
     torch_dtype: "float16"
     load_in_4bit: true
@@ -11,7 +11,7 @@ models:
     temperature: 0.0
 
   internvl3-8b:
-    hf_id: "OpenGVLab/InternVL3-8B"
+    hf_id: "models/internvl3-8b"
     family: "internvl"
     torch_dtype: "bfloat16"
     load_in_4bit: true

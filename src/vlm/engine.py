@@ -113,6 +113,8 @@ class VLMEngine:
                 except Exception:
                     self.model = AutoModelForCausalLM.from_pretrained(model_id_or_path, **kwargs)
                 
+            if hasattr(self.model, "img_context_token_id") and getattr(self.model, "img_context_token_id", None) is None:
+                self.model.img_context_token_id = 151667
             self.model.eval()
             self.current_model_id = model_id_or_path
             print(f"Model {model_id_or_path} loaded successfully.")
