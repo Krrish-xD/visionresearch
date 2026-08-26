@@ -1,0 +1,17 @@
+{
+  "mmvp": {
+    "path": "data/processed/mmvp.jsonl",
+    "description": "MMVP Benchmark (300 CLIP-blind visual pairs across 9 categories)",
+    "command": "python -m scripts.setup_resources --dataset mmvp"
+  },
+  "clevr": {
+    "path": "data/processed/clevr.jsonl",
+    "description": "CLEVR Grounding Subset (1,000 synthetic scene graphs)",
+    "command": "python -m scripts.setup_resources --dataset clevr --clevr-size 1000"
+  },
+  "gqa": {
+    "path": "data/processed/gqa.jsonl",
+    "description": "GQA Relational Subset (1,000 real-world scene graphs)",
+    "command": "python -m scripts.setup_resources --dataset gqa --gqa-size 1000"
+  }
+}

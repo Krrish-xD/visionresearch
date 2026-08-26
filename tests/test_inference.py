@@ -145,3 +145,14 @@ class TestLoadModelRouting:
             mock_qwen.from_pretrained.return_value = MagicMock()
             engine.load_model("/weights/QWEN2-VL-LARGE")
             mock_qwen.from_pretrained.assert_called_once()
+
+    @patch("src.vlm.engine.AutoProcessor")
+    @patch("src.vlm.engine.AutoModel")
+    def test_internvl_routing(self, mock_auto_model, mock_proc, engine):
+        """InternVL models should route to AutoModel with remote code."""
+        mock_proc.from_pretrained.return_value = MagicMock()
+        mock_auto_model.from_pretrained.return_value = MagicMock()
+
+        engine.load_model("/weights/internvl3-8b")
+        mock_auto_model.from_pretrained.assert_called_once()
+        assert engine.current_model_id == "/weights/internvl3-8b"

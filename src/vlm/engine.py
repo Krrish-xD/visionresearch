@@ -3,7 +3,7 @@
 import os
 import math
 import torch
-from transformers import AutoProcessor, AutoModelForCausalLM
+from transformers import AutoProcessor, AutoModelForCausalLM, AutoTokenizer, AutoModel
 
 try:
     from transformers import AutoModelForVision2Seq
@@ -14,6 +14,16 @@ try:
     from transformers import LlavaForConditionalGeneration
 except ImportError:
     LlavaForConditionalGeneration = None
+
+try:
+    from transformers import LlavaNextForConditionalGeneration
+except ImportError:
+    LlavaNextForConditionalGeneration = None
+
+try:
+    from transformers import LlavaOnevisionForConditionalGeneration
+except ImportError:
+    LlavaOnevisionForConditionalGeneration = None
 
 try:
     from transformers import Qwen2VLForConditionalGeneration
@@ -70,17 +80,29 @@ class VLMEngine:
         self.unload_model()
             
         try:
-            self.processor = AutoProcessor.from_pretrained(
-                model_id_or_path, 
-                trust_remote_code=trust_remote_code
-            )
+            try:
+                self.processor = AutoProcessor.from_pretrained(
+                    model_id_or_path, 
+                    trust_remote_code=trust_remote_code
+                )
+            except Exception:
+                self.processor = AutoTokenizer.from_pretrained(
+                    model_id_or_path,
+                    trust_remote_code=trust_remote_code
+                )
             
             # Routing heuristic
             model_lower = model_id_or_path.lower()
-            if "llava" in model_lower and LlavaForConditionalGeneration:
+            if "onevision" in model_lower and LlavaOnevisionForConditionalGeneration:
+                model_class = LlavaOnevisionForConditionalGeneration
+            elif ("next" in model_lower or "v1.6" in model_lower) and LlavaNextForConditionalGeneration:
+                model_class = LlavaNextForConditionalGeneration
+            elif "llava" in model_lower and LlavaForConditionalGeneration:
                 model_class = LlavaForConditionalGeneration
             elif "qwen" in model_lower and Qwen2VLForConditionalGeneration:
                 model_class = Qwen2VLForConditionalGeneration
+            elif "internvl" in model_lower:
+                model_class = AutoModel
             else:
                 model_class = AutoModelForCausalLM
                 
@@ -102,16 +124,19 @@ class VLMEngine:
                 except ImportError:
                     pass
 
-            try:
-                self.model = model_class.from_pretrained(model_id_or_path, **kwargs)
-            except Exception:
+            loaded = False
+            for candidate_cls in [model_class, AutoModelForVision2Seq, AutoModelForCausalLM, AutoModel]:
+                if candidate_cls is None:
+                    continue
                 try:
-                    if AutoModelForVision2Seq is not None:
-                        self.model = AutoModelForVision2Seq.from_pretrained(model_id_or_path, **kwargs)
-                    else:
-                        raise RuntimeError("AutoModelForVision2Seq not available")
+                    self.model = candidate_cls.from_pretrained(model_id_or_path, **kwargs)
+                    loaded = True
+                    break
                 except Exception:
-                    self.model = AutoModelForCausalLM.from_pretrained(model_id_or_path, **kwargs)
+                    continue
+
+            if not loaded or self.model is None:
+                raise RuntimeError(f"Could not load model {model_id_or_path} with available model classes.")
                 
             self.model.eval()
             self.current_model_id = model_id_or_path

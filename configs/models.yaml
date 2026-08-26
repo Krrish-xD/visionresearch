@@ -1,15 +1,7 @@
 # Model Configurations and Prompts
+# Optimized for 16 GB VRAM GPU Budget (NVIDIA RTX 2000 Ada / 16 GB)
 
 models:
-  llava-1.5-7b:
-    hf_id: "llava-hf/llava-1.5-7b-hf"
-    family: "llava"
-    torch_dtype: "float16"
-    load_in_4bit: true
-    trust_remote_code: false
-    max_new_tokens: 16
-    temperature: 0.0
-
   internvl3-8b:
     hf_id: "OpenGVLab/InternVL3-8B"
     family: "internvl"
@@ -19,12 +11,21 @@ models:
     max_new_tokens: 16
     temperature: 0.0
 
-  internvl3-1b:
-    hf_id: "OpenGVLab/InternVL3-1B"
-    family: "internvl"
+  llava-onevision-7b:
+    hf_id: "lmms-lab/llava-onevision-qwen2-7b-ov"
+    family: "llava_onevision"
     torch_dtype: "bfloat16"
-    load_in_4bit: false
-    trust_remote_code: true
+    load_in_4bit: true
+    trust_remote_code: false
+    max_new_tokens: 16
+    temperature: 0.0
+
+  llava-next-7b:
+    hf_id: "llava-hf/llava-v1.6-mistral-7b-hf"
+    family: "llava_next"
+    torch_dtype: "float16"
+    load_in_4bit: true
+    trust_remote_code: false
     max_new_tokens: 16
     temperature: 0.0
 
@@ -46,3 +47,5 @@ prompts:
     instruction: "Answer with only the single attribute word.\nQuestion: {question}"
   choice:
     instruction: "Options: {options}\nAnswer with only the letter of the correct option, for example (a) or (b).\nQuestion: {question}"
+  relation:
+    instruction: "Question: {question}\nAnswer with only the relation word (e.g., left, right, above, below, front, behind)."

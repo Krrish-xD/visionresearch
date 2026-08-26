@@ -9,7 +9,7 @@ def main():
     backend_dir = os.path.join(root_dir, "backend")
     frontend_dir = os.path.join(root_dir, "frontend")
 
-    # Create virtual environment if it doesn't exist
+    # 1. Ensure Python virtual environment exists and dependencies are installed
     venv_dir = os.path.join(root_dir, "venv")
     if not os.path.exists(venv_dir):
         print("-> venv not found. Creating virtual environment and installing dependencies... (this might take a moment)")
@@ -33,7 +33,7 @@ def main():
 
     print("Starting Vision Research Visualizer...")
 
-    # Automatically run npm install if node_modules doesn't exist
+    # 2. Ensure frontend dependencies are installed
     if not os.path.exists(os.path.join(frontend_dir, "node_modules")):
         print("-> node_modules not found. Running 'npm install' first... (this might take a moment)")
         try:
@@ -43,7 +43,15 @@ def main():
             print(f"❌ Failed to run npm install: {e}")
             return
 
-    # Use buffering=1 for line buffering so logs flush immediately
+    # 3. Setup and verify all resources (datasets, splits) via unified setup_resources.py
+    setup_script = os.path.join(root_dir, "scripts", "setup_resources.py")
+    if os.path.exists(setup_script):
+        try:
+            subprocess.run([python_executable, setup_script], cwd=root_dir, check=True)
+        except subprocess.CalledProcessError as e:
+            print(f"⚠️ Warning: Resource setup encountered an error: {e}")
+
+    # 4. Launch backend and frontend servers
     backend_log = open("backend_startup.log", "w", buffering=1)
     frontend_log = open("frontend_startup.log", "w", buffering=1)
 
