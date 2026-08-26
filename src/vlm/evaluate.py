@@ -76,8 +76,8 @@ class VLMInferenceRunner:
             outputs = result["outputs"]
             prompt_len = result["prompt_len"]
             
-            # Use original extract_token_confidence as required by evaluation pipeline
-            raw_conf, logprobs = extract_token_confidence(outputs.scores, result["generated_ids"], prompt_len=prompt_len)
+            # Use extract_token_confidence to get confidence and answer logits
+            raw_conf, logprobs, ans_logits, cand_ids = extract_token_confidence(outputs.scores, result["generated_ids"], prompt_len=prompt_len)
 
         else:
             # Deterministic simulation/fallback mode for offline or mock testing
@@ -97,6 +97,7 @@ class VLMInferenceRunner:
                     raw_ans = "unknown"
                 raw_conf = 0.80 + (hash(item["item_id"]) % 20) / 100.0
             logprobs = [float(torch.log(torch.tensor(raw_conf)).item())]
+            ans_logits = [float(torch.log(torch.tensor(raw_conf)).item()), float(torch.log(torch.tensor(1.0 - raw_conf + 1e-4)).item()), -3.0]
 
         # Parse claim
         claim, norm_ans, parse_status = parse_vlm_answer_to_claim(
@@ -117,6 +118,7 @@ class VLMInferenceRunner:
             "claim": claim,
             "raw_confidence": float(raw_conf),
             "token_logprobs": logprobs,
+            "answer_logits": ans_logits,
             "is_correct": bool(is_correct),
             "parse_status": parse_status
         }

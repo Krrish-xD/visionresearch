@@ -248,7 +248,7 @@ class TestDeterminismAndNumericalInvariants:
             assert np.isclose(logprobs[0], expected_logprob, atol=1e-5)
 
     def test_extract_token_confidence_empty_scores(self):
-        conf, logprobs = extract_token_confidence((), torch.tensor([1, 2, 3]), prompt_len=0)
+        conf, logprobs, ans_logits, cand_ids = extract_token_confidence((), torch.tensor([1, 2, 3]), prompt_len=0)
         assert conf == 1.0
         assert logprobs == [0.0]
 
@@ -256,7 +256,7 @@ class TestDeterminismAndNumericalInvariants:
         scores = (torch.randn(1, 100),)
         gen_ids = torch.tensor([[10, 20]])
         # prompt_len equals sequence length => 0 new tokens
-        conf, logprobs = extract_token_confidence(scores, gen_ids, prompt_len=2)
+        conf, logprobs, ans_logits, cand_ids = extract_token_confidence(scores, gen_ids, prompt_len=2)
         assert conf == 1.0
         assert logprobs == [0.0]
 
@@ -271,7 +271,7 @@ class TestDeterminismAndNumericalInvariants:
         gen_ids = torch.tensor([[1, 2, 5, 12, 25]])
         prompt_len = 2
 
-        conf, logprobs = extract_token_confidence(scores, gen_ids, prompt_len=prompt_len)
+        conf, logprobs, ans_logits, cand_ids = extract_token_confidence(scores, gen_ids, prompt_len=prompt_len)
         assert len(logprobs) == 3
         assert 0.0001 <= conf <= 1.0
         # Check geometric mean property
@@ -287,7 +287,7 @@ class TestDeterminismAndNumericalInvariants:
         scores = (large_logits,)
         gen_ids = torch.tensor([[3]])
 
-        conf, logprobs = extract_token_confidence(scores, gen_ids, prompt_len=0)
+        conf, logprobs, ans_logits, cand_ids = extract_token_confidence(scores, gen_ids, prompt_len=0)
         assert not np.isnan(conf)
         assert not np.isinf(conf)
         assert 0.0001 <= conf <= 1.0

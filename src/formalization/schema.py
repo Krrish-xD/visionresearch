@@ -58,6 +58,10 @@ PREDICTION_SCHEMA: Dict[str, Any] = {
             "type": "array",
             "items": {"type": "number"}
         },
+        "answer_logits": {
+            "type": "array",
+            "items": {"type": "number"}
+        },
         "is_correct": {"type": "boolean"},
         "parse_status": {"type": "string", "enum": ["success", "failed", "unsupported"]}
     }

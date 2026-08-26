@@ -21,9 +21,31 @@ def compute_sfar(is_correct_list: List[bool], is_accepted_list: List[bool]) -> f
         return 0.0
     return false_claims_accepted / false_claims_total
 
-def compute_contradiction_metrics(is_correct_list: List[bool], is_flagged_contradicted_list: List[bool]) -> Dict[str, float]:
+def compute_soor(is_correct_list: List[bool], soor_triggered_list: List[bool]) -> float:
     """
-    Compute Precision, Recall, and F1 for contradiction detection.
+    Compute Solver Over-Override Rate (SOOR).
+    SOOR = count(false VLM claim overriding ground truth) / count(false VLM claims)
+    """
+    false_claims_total = 0
+    soor_events = 0
+
+    for is_correct, triggered in zip(is_correct_list, soor_triggered_list):
+        if not is_correct:
+            false_claims_total += 1
+            if triggered:
+                soor_events += 1
+
+    if false_claims_total == 0:
+        return 0.0
+    return soor_events / false_claims_total
+
+def compute_contradiction_metrics(
+    is_correct_list: List[bool],
+    is_flagged_contradicted_list: List[bool],
+    soor_triggered_list: List[bool] = None
+) -> Dict[str, float]:
+    """
+    Compute Precision, Recall, F1, SFAR, and SOOR for contradiction detection.
     
     Ground Truth Contradiction: (not is_correct)
     Predicted Contradiction: is_flagged_contradicted
@@ -48,6 +70,9 @@ def compute_contradiction_metrics(is_correct_list: List[bool], is_flagged_contra
     recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
     f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
     accuracy = (tp + tn) / len(is_correct_list) if len(is_correct_list) > 0 else 0.0
+    
+    sfar_val = compute_sfar(is_correct_list, [not f for f in is_flagged_contradicted_list])
+    soor_val = compute_soor(is_correct_list, soor_triggered_list) if soor_triggered_list is not None else sfar_val
 
     return {
         "tp": tp,
@@ -58,7 +83,8 @@ def compute_contradiction_metrics(is_correct_list: List[bool], is_flagged_contra
         "recall": recall,
         "f1": f1,
         "accuracy": accuracy,
-        "sfar": compute_sfar(is_correct_list, [not f for f in is_flagged_contradicted_list])
+        "sfar": sfar_val,
+        "soor": soor_val
     }
 
 def compute_solve_time_stats(solve_times_ms: List[float]) -> Dict[str, float]:

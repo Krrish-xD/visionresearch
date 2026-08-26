@@ -27,18 +27,16 @@ def encode_fact_to_z3(fact: Dict[str, Any], prefix: str = "sym") -> Tuple[z3.Exp
         try:
             int_val = int(value) if value is not None else 0
         except (ValueError, TypeError):
-            # Fallback for non-integer choice or symbolic values
             int_val = abs(hash(str(value).lower())) % 100000
         return (var == int_val), f"count_{subject}"
 
     elif predicate == "exists":
         var = z3.Bool(f"exists_{subject}")
-        bool_val = bool(value)
+        bool_val = bool(value) if value is not None else True
         return (var == bool_val), f"exists_{subject}"
 
     elif predicate == "attribute":
         attr_type = sanitize_name(fact.get("attribute_type", "prop"))
-        # Map string attribute values to distinct integer hash identifiers
         val_str = str(value).lower()
         val_id = abs(hash(val_str)) % 100000
         var = z3.Int(f"attr_{subject}_{attr_type}")
@@ -48,15 +46,15 @@ def encode_fact_to_z3(fact: Dict[str, Any], prefix: str = "sym") -> Tuple[z3.Exp
         rel_type = sanitize_name(fact.get("relation_type", "related"))
         obj = sanitize_name(fact.get("object", "target"))
         var = z3.Bool(f"rel_{subject}_{rel_type}_{obj}")
-        return (var == True), f"rel_{subject}_{rel_type}_{obj}"
+        bool_val = bool(value) if value is not None else True
+        return (var == bool_val), f"rel_{subject}_{rel_type}_{obj}"
 
     elif predicate == "choice":
-        # Choice option (a), (b), etc.
         val_str = str(value).lower()
         val_id = abs(hash(val_str)) % 100000
         var = z3.Int(f"choice_{subject}")
         return (var == val_id), f"choice_{subject}"
 
     # Default generic boolean symbol
-    var = z3.Bool(f"{prefix}_{subject}_{predicate}")
-    return (var == True), f"{prefix}_{subject}_{predicate}"
+    var = z3.Bool(f"sym_{subject}_{predicate}")
+    return (var == True), f"sym_{subject}_{predicate}"

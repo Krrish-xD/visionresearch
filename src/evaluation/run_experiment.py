@@ -95,6 +95,7 @@ def run_experiment_pipeline(
 
     # 4. Calibration Split: Extract confidences and fit calibrators
     cal_confs = []
+    cal_logits = []
     cal_labels = []
 
     for item_id in cal_ids:
@@ -102,17 +103,22 @@ def run_experiment_pipeline(
             p = preds_by_id[item_id]
             cal_confs.append(p["raw_confidence"])
             cal_labels.append(p["is_correct"])
+            logits_vec = p.get("answer_logits", None)
+            if logits_vec is None:
+                p_val = max(1e-5, min(1.0 - 1e-5, float(p["raw_confidence"])))
+                logits_vec = [float(np.log(p_val / (1.0 - p_val))), 0.0]
+            cal_logits.append(logits_vec)
 
     print(f"Fitting calibrators on {len(cal_confs)} calibration items...")
     temp_calibrator = TemperatureScaling()
-    temp_calibrator.fit(cal_confs, cal_labels)
+    temp_calibrator.fit(cal_logits, cal_labels)
     print(f"Fitted Temperature: T = {temp_calibrator.temperature:.4f}")
 
     iso_calibrator = IsotonicCalibrator()
     iso_calibrator.fit(cal_confs, cal_labels)
 
     conf_calibrator = ConformalRiskWeighting(alpha=0.10)
-    conf_calibrator.fit(cal_confs, cal_labels)
+    conf_calibrator.fit(cal_logits, cal_labels)
     print(f"Fitted Conformal Threshold: q_hat = {conf_calibrator.q_hat:.4f}")
 
     # 5. Evaluation Split: Transform confidences and run MaxSMT solver across all 6 conditions
@@ -123,17 +129,28 @@ def run_experiment_pipeline(
     eval_items_ordered = [items_by_id[iid] for iid in eval_ids if iid in items_by_id and iid in preds_by_id]
     print(f"Evaluating solver on {len(eval_items_ordered)} held-out items across 6 conditions...")
 
+    # Extract evaluation logit vectors and confidences
+    eval_logits = []
+    for it in eval_items_ordered:
+        p_obj = preds_by_id[it["item_id"]]
+        l_vec = p_obj.get("answer_logits", None)
+        if l_vec is None:
+            p_val = max(1e-5, min(1.0 - 1e-5, float(p_obj["raw_confidence"])))
+            l_vec = [float(np.log(p_val / (1.0 - p_val))), 0.0]
+        eval_logits.append(l_vec)
+
     # Compute calibrated confidences
     raw_confs_arr = np.array([preds_by_id[it["item_id"]]["raw_confidence"] for it in eval_items_ordered])
-    temp_confs_arr = temp_calibrator.transform(raw_confs_arr)
+    temp_confs_arr = temp_calibrator.transform(eval_logits)
     iso_confs_arr = iso_calibrator.transform(raw_confs_arr)
-    conf_weights_arr = conf_calibrator.transform(raw_confs_arr)
+    conf_weights_arr = conf_calibrator.transform(eval_logits)
 
     eval_labels = [preds_by_id[it["item_id"]]["is_correct"] for it in eval_items_ordered]
 
     # Store condition flags
     conditions = ["hard_claim_check", "uniform_soft", "raw_confidence", "temperature_scaled", "isotonic", "conformal_risk"]
     flagged_contradicted = {c: [] for c in conditions}
+    soor_triggered_flags = {c: [] for c in conditions}
     solve_times = {c: [] for c in conditions}
 
     for idx, item in enumerate(eval_items_ordered):
@@ -168,16 +185,18 @@ def run_experiment_pipeline(
         if claim is not None:
             status, is_contra, t_ms = check_hard_contradiction(gold_facts, claim)
             flagged_contradicted["hard_claim_check"].append(is_contra)
+            soor_triggered_flags["hard_claim_check"].append(False)
             solve_times["hard_claim_check"].append(t_ms)
             row["hard_verdict"] = "contradicted" if is_contra else "sat"
             row["hard_solve_ms"] = t_ms
         else:
             flagged_contradicted["hard_claim_check"].append(True)
+            soor_triggered_flags["hard_claim_check"].append(False)
             solve_times["hard_claim_check"].append(0.0)
             row["hard_verdict"] = "unparsed"
             row["hard_solve_ms"] = 0.0
 
-        # MaxSMT conditions
+        # MaxSMT conditions with soft GT baseline weight W_gt=500
         weights_map = {
             "uniform_soft": 1.0,
             "raw_confidence": raw_c,
@@ -188,18 +207,24 @@ def run_experiment_pipeline(
 
         for cond_name, weight_val in weights_map.items():
             if claim is not None:
-                status, sat_list, t_ms = verify_with_maxsmt(gold_facts, [claim], [weight_val])
+                status, sat_list, gt_sat_list, soor_list, t_ms = verify_with_maxsmt(gold_facts, [claim], [weight_val], gt_weight=500)
                 is_sat = sat_list[0] if sat_list else False
+                is_soor = soor_list[0] if soor_list else False
+                # Contradicted means either VLM claim was dropped (not is_sat) OR GT was preserved while VLM was rejected
                 is_contra = not is_sat
                 flagged_contradicted[cond_name].append(is_contra)
+                soor_triggered_flags[cond_name].append(is_soor)
                 solve_times[cond_name].append(t_ms)
                 row[f"{cond_name}_verdict"] = "sat" if is_sat else "unsat"
                 row[f"{cond_name}_contra"] = is_contra
+                row[f"{cond_name}_soor"] = is_soor
             else:
                 flagged_contradicted[cond_name].append(True)
+                soor_triggered_flags[cond_name].append(False)
                 solve_times[cond_name].append(0.0)
                 row[f"{cond_name}_verdict"] = "unparsed"
                 row[f"{cond_name}_contra"] = True
+                row[f"{cond_name}_soor"] = False
 
         per_item_rows.append(row)
 
@@ -229,13 +254,14 @@ def run_experiment_pipeline(
     table_2_df = generate_table_2_calibration(table_2_rows)
     save_table_bundle(table_2_df, os.path.join(metrics_dir, "table2_calibration_metrics"))
 
-    # 7. Compute Table 3: Contradiction Detection Metrics & Bootstrap CIs
+    # 7. Compute Table 3: Contradiction Detection Metrics, SFAR, SOOR & Bootstrap CIs
     table_3_rows = []
     f1_list, ci_l_list, ci_u_list = [], [], []
 
     for cond in conditions:
         flags = flagged_contradicted[cond]
-        metrics = compute_contradiction_metrics(eval_labels, flags)
+        soor_flags = soor_triggered_flags[cond]
+        metrics = compute_contradiction_metrics(eval_labels, flags, soor_triggered_list=soor_flags)
         
         # Bootstrap 95% CI for F1
         def f1_eval_func(yt, yp):
@@ -252,6 +278,7 @@ def run_experiment_pipeline(
             "Recall": f"{metrics['recall']:.4f}",
             "F1 (95% CI)": f"{metrics['f1']:.4f} [{ci_l:.3f}, {ci_u:.3f}]",
             "SFAR": f"{metrics['sfar']:.4f}",
+            "SOOR": f"{metrics['soor']:.4f}",
             "Accuracy": f"{metrics['accuracy']:.4f}"
         })
 

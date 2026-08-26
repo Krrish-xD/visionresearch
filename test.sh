@@ -1,6 +1,10 @@
 #!/bin/bash
 echo "Running backend pytest... (output hidden, saving to test_results.log)"
-pytest tests/ -v > test_results.log 2>&1
+if [ -f "venv/bin/pytest" ]; then
+    venv/bin/pytest tests/ -v > test_results.log 2>&1
+else
+    pytest tests/ -v > test_results.log 2>&1
+fi
 echo "Backend tests finished."
 
 echo "Checking frontend compilation..."

@@ -70,6 +70,38 @@ def wilcoxon_paired_test(scores_a: List[float], scores_b: List[float]) -> Tuple[
     res = stats.wilcoxon(diff)
     return float(res.statistic), float(res.pvalue)
 
+def cohens_h(p1: float, p2: float) -> float:
+    """
+    Compute Cohen's h effect size for comparing two proportions.
+    h = 2 * arcsin(sqrt(p1)) - 2 * arcsin(sqrt(p2))
+    Interpretation:
+        |h| ~ 0.2: small effect
+        |h| ~ 0.5: medium effect
+        |h| >= 0.8: large effect
+    """
+    p1_clamped = np.clip(p1, 0.0, 1.0)
+    p2_clamped = np.clip(p2, 0.0, 1.0)
+    phi1 = 2.0 * np.arcsin(np.sqrt(p1_clamped))
+    phi2 = 2.0 * np.arcsin(np.sqrt(p2_clamped))
+    return float(phi1 - phi2)
+
+def compute_paired_contingency(flags_a: List[bool], flags_b: List[bool]) -> np.ndarray:
+    """
+    Compute 2x2 contingency table for McNemar's test:
+        [[n00, n01],
+         [n10, n11]]
+    where 1 = correct / detected, 0 = error / missed.
+    """
+    a = np.array(flags_a, dtype=bool)
+    b = np.array(flags_b, dtype=bool)
+    
+    n11 = int(np.sum(a & b))
+    n10 = int(np.sum(a & ~b))
+    n01 = int(np.sum(~a & b))
+    n00 = int(np.sum(~a & ~b))
+    
+    return np.array([[n00, n01], [n10, n11]], dtype=np.int64)
+
 def apply_benjamini_hochberg(p_values: List[float], alpha: float = 0.05) -> Tuple[List[bool], List[float]]:
     """Apply Benjamini-Hochberg FDR correction for multiple comparisons."""
     if not p_values:
