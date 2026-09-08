@@ -32,6 +32,46 @@ def parse_choice_letter(raw_answer: str) -> Optional[str]:
         return "b"
     return None
 
+def parse_options_map(options: str) -> Dict[str, str]:
+    """Parse options string into a mapping from letter (e.g. 'a', 'b') to option text."""
+    if not options or not isinstance(options, str):
+        return {}
+    matches = list(re.finditer(r"\(([a-zA-Z0-9])\)\s*", options))
+    if not matches:
+        return {}
+    opt_map = {}
+    for i, m in enumerate(matches):
+        letter = m.group(1).lower()
+        start = m.end()
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(options)
+        text = normalize_text(options[start:end])
+        opt_map[letter] = text
+    return opt_map
+
+def match_option_letter_or_text(raw_answer: str, options: str = "") -> Optional[str]:
+    """Extract choice letter either directly or by matching option text."""
+    # 1. Try direct choice letter
+    letter = parse_choice_letter(raw_answer)
+    if letter is not None:
+        return letter
+
+    # 2. If options provided, match against option text
+    if options:
+        opt_map = parse_options_map(options)
+        norm_ans = normalize_text(raw_answer)
+        # Check longest matching option text first to prevent substring collisions
+        sorted_opts = sorted(opt_map.items(), key=lambda kv: len(kv[1]), reverse=True)
+        for opt_let, opt_txt in sorted_opts:
+            if not opt_txt:
+                continue
+            # Exact match or prefix match or word boundary search
+            if norm_ans == opt_txt or norm_ans.startswith(opt_txt):
+                return opt_let
+            if re.search(rf"\b{re.escape(opt_txt)}\b", norm_ans):
+                return opt_let
+
+    return None
+
 def parse_count(raw_answer: str) -> Tuple[Optional[int], str]:
     """Extract integer count from answer string."""
     text = normalize_text(raw_answer)
@@ -91,6 +131,24 @@ def parse_vlm_answer_to_claim(
     elif question:
         subject = extract_subject_from_question(question)
 
+    # Check choice/options first if options exist or answer_type is choice
+    has_choice_fact = (gold_facts and len(gold_facts) > 0 and isinstance(gold_facts[0], dict)
+                       and str(gold_facts[0].get("value", "")).startswith("("))
+    if answer_type == "choice" or options or has_choice_fact:
+        opt_letter = match_option_letter_or_text(raw_answer, options=options)
+        if opt_letter is not None:
+            if gold_facts and len(gold_facts) > 0 and isinstance(gold_facts[0], dict):
+                gold_fact = gold_facts[0]
+                return {
+                    "predicate": gold_fact.get("predicate", "choice"),
+                    "subject": gold_fact.get("subject", subject),
+                    "value": f"({opt_letter})",
+                    "attribute_type": gold_fact.get("attribute_type", "option")
+                }, f"({opt_letter})", "success"
+            return {"predicate": "choice", "subject": subject, "value": f"({opt_letter})"}, f"({opt_letter})", "success"
+        if answer_type == "choice":
+            return None, norm_text, "failed"
+
     if answer_type == "count":
         val, norm = parse_count(raw_answer)
         if val is not None:
@@ -104,7 +162,6 @@ def parse_vlm_answer_to_claim(
         return None, norm_text, "failed"
 
     elif answer_type == "attribute":
-        # Extract attribute value
         tokens = norm_text.split()
         if tokens:
             attr_val = tokens[0]
@@ -114,24 +171,7 @@ def parse_vlm_answer_to_claim(
             return {"predicate": "attribute", "subject": subject, "attribute_type": attr_type, "value": attr_val}, attr_val, "success"
         return None, norm_text, "failed"
 
-    elif answer_type == "choice" or (options and parse_choice_letter(raw_answer) is not None):
-        letter = parse_choice_letter(raw_answer)
-        if letter is not None:
-            # Map choice letter to claim if gold facts are structured
-            if gold_facts and len(gold_facts) > 0 and isinstance(gold_facts[0], dict):
-                gold_fact = gold_facts[0]
-                # If letter matches gold or differs, determine value
-                return {
-                    "predicate": gold_fact.get("predicate", "choice"),
-                    "subject": gold_fact.get("subject", subject),
-                    "value": f"({letter})",
-                    "attribute_type": gold_fact.get("attribute_type", "option")
-                }, f"({letter})", "success"
-            return {"predicate": "choice", "subject": subject, "value": f"({letter})"}, f"({letter})", "success"
-        return None, norm_text, "failed"
-
     elif answer_type == "relation":
-        # Check standard spatial relations
         for rel in ["left", "right", "above", "below", "front", "behind", "next_to", "inside"]:
             if rel in norm_text:
                 obj_b = "reference_object"

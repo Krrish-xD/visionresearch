@@ -158,3 +158,72 @@ def plot_ece_vs_sfar(
     plt.savefig(output_path, dpi=300)
     plt.close()
     print(f"Saved Figure 5 -> {output_path}")
+
+def plot_coverage_vs_sfar(
+    tradeoff_dict: Dict[str, Any],
+    output_path: str = "results/figures/fig6_coverage_vs_sfar.png"
+):
+    """
+    Figure 6. Conformal Selective Abstention: Coverage vs. SFAR Trade-off Curves.
+    """
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    plt.figure(figsize=(7, 5))
+
+    colors = {"Raw": "#d95f02", "Temperature": "#1b9e77", "Isotonic": "#7570b3"}
+    styles = {"Raw": "--", "Temperature": "-.", "Isotonic": "-"}
+
+    for name, df in tradeoff_dict.items():
+        if df is not None and not df.empty:
+            c = colors.get(name, "#333333")
+            s = styles.get(name, "-")
+            # Sort by coverage descending
+            df_sorted = df.sort_values("coverage", ascending=False)
+            plt.plot(
+                df_sorted["coverage"],
+                df_sorted["sfar"],
+                label=f"{name}",
+                color=c,
+                linestyle=s,
+                linewidth=2.5
+            )
+
+    plt.xlabel("Coverage (Proportion of Retained Instances)")
+    plt.ylabel("Solver False Acceptance Rate (SFAR)")
+    plt.title("Selective Abstention: Risk Reduction via Calibration")
+    plt.xlim(0.0, 1.05)
+    plt.ylim(-0.02, 1.02)
+    plt.legend(frameon=True)
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=300)
+    plt.close()
+    print(f"Saved Figure 6 -> {output_path}")
+
+def plot_multi_hypothesis_recovery(
+    recovery_dict: Dict[str, Dict[str, float]],
+    output_path: str = "results/figures/fig7_multi_hypothesis_recovery.png"
+):
+    """
+    Figure 7. Multi-Hypothesis N-Best MaxSMT Recovery across Models.
+    """
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    models = list(recovery_dict.keys())
+    base_accs = [recovery_dict[m].get("base_acc", 0.0) * 100.0 for m in models]
+    recovered_accs = [recovery_dict[m].get("recovered_acc", 0.0) * 100.0 for m in models]
+
+    x = np.arange(len(models))
+    width = 0.35
+
+    plt.figure(figsize=(8, 5))
+    plt.bar(x - width/2, base_accs, width, label="Top-1 Base Accuracy", color="#6baed6", edgecolor="black")
+    plt.bar(x + width/2, recovered_accs, width, label="MaxSMT Recovered Accuracy (Hard-GT)", color="#31a354", edgecolor="black")
+
+    plt.ylabel("Accuracy (%)")
+    plt.title("Multi-Hypothesis N-Best MaxSMT Error Recovery")
+    plt.xticks(x, [m.upper() for m in models])
+    plt.ylim(0, 105)
+    plt.legend(frameon=True)
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=300)
+    plt.close()
+    print(f"Saved Figure 7 -> {output_path}")
+

@@ -252,6 +252,7 @@ def run_experiment_pipeline(
             "NLL": f"{m_metrics['nll']:.4f}"
         })
     table_2_df = generate_table_2_calibration(table_2_rows)
+    save_table_bundle(table_2_df, os.path.join(metrics_dir, f"{model_key}_{dataset_name}_table2_calibration_metrics"))
     save_table_bundle(table_2_df, os.path.join(metrics_dir, "table2_calibration_metrics"))
 
     # 7. Compute Table 3: Contradiction Detection Metrics, SFAR, SOOR & Bootstrap CIs
@@ -283,6 +284,7 @@ def run_experiment_pipeline(
         })
 
     table_3_df = generate_table_3_contradiction(table_3_rows)
+    save_table_bundle(table_3_df, os.path.join(metrics_dir, f"{model_key}_{dataset_name}_table3_contradiction_metrics"))
     save_table_bundle(table_3_df, os.path.join(metrics_dir, "table3_contradiction_metrics"))
 
     # 8. Compute Table 4: Category-level SFAR breakdown
@@ -304,6 +306,7 @@ def run_experiment_pipeline(
         cat_rows.append(row_cat)
 
     table_4_df = generate_table_4_category_sfar(cat_rows)
+    save_table_bundle(table_4_df, os.path.join(metrics_dir, f"{model_key}_{dataset_name}_table4_category_breakdown"))
     save_table_bundle(table_4_df, os.path.join(metrics_dir, "table4_category_breakdown"))
 
     # 9. Compute Table 5: Solver Runtime Stats
@@ -317,6 +320,7 @@ def run_experiment_pipeline(
             "Max Solve Time (ms)": f"{t_stats['max_ms']:.2f}"
         })
     table_5_df = generate_table_5_solver_runtime(runtime_rows)
+    save_table_bundle(table_5_df, os.path.join(metrics_dir, f"{model_key}_{dataset_name}_table5_solver_runtime"))
     save_table_bundle(table_5_df, os.path.join(metrics_dir, "table5_solver_runtime"))
 
     # 10. Generate Figures
