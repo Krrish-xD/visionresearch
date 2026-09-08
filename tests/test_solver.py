@@ -47,11 +47,25 @@ class TestZ3Verifier(unittest.TestCase):
         ]
         weights = [0.92]
 
-        status, claim_sat, gt_sat, soor_list, t_ms = verify_with_maxsmt(gt, claims, weights, gt_weight=500)
+        status, claim_sat, gt_sat, soor_list, t_ms = verify_with_maxsmt(gt, claims, weights, gt_weight=500, hard_gt=False)
         self.assertEqual(status, "sat")
         self.assertTrue(claim_sat[0])   # VLM claim satisfied
         self.assertFalse(gt_sat[0])     # GT dropped
         self.assertTrue(soor_list[0])   # SOOR triggered!
+
+    def test_maxsmt_hard_gt_verification(self):
+        gt = [{"predicate": "count", "subject": "chair_leg", "value": 3}]
+        # Conflicting claim even with high weight (0.99) cannot override hard GT
+        claims = [
+            {"predicate": "count", "subject": "chair_leg", "value": 5}
+        ]
+        weights = [0.99]
+
+        status, claim_sat, gt_sat, soor_list, t_ms = verify_with_maxsmt(gt, claims, weights, hard_gt=True)
+        self.assertEqual(status, "sat")
+        self.assertFalse(claim_sat[0])  # conflicting claim dropped
+        self.assertTrue(gt_sat[0])      # GT preserved as hard constraint
+        self.assertFalse(soor_list[0])  # No SOOR possible with hard GT
 
     def test_sfar_computation(self):
         # 4 items:

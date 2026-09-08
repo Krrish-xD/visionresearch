@@ -3,12 +3,14 @@
 from src.calibration.temperature import TemperatureScaling
 from src.calibration.isotonic import IsotonicCalibrator
 from src.calibration.conformal import ConformalRiskWeighting
+from src.calibration.selective import SelectiveAbstentionController
 from src.calibration.metrics import compute_ece, compute_brier_score, compute_nll, evaluate_calibration
 
 __all__ = [
     "TemperatureScaling",
     "IsotonicCalibrator",
     "ConformalRiskWeighting",
+    "SelectiveAbstentionController",
     "compute_ece",
     "compute_brier_score",
     "compute_nll",
