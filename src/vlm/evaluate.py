@@ -17,7 +17,7 @@ from src.vlm.engine import VLMEngine
 class VLMInferenceRunner:
     """Manages token logit extraction, and structured prediction caching for evaluation."""
 
-    def __init__(self, model_key: str = "llava-1.5-7b", config_path: str = "configs/models.yaml"):
+    def __init__(self, model_key: str = "internvl3-8b", config_path: str = "configs/models.yaml"):
         self.model_key = model_key
         with open(config_path, "r", encoding="utf-8") as f:
             data = yaml.safe_load(f)
@@ -25,8 +25,8 @@ class VLMInferenceRunner:
 
         if model_key in self.model_configs:
             self.cfg = self.model_configs[model_key]
-        elif "llava-1.5-7b" in self.model_configs:
-            self.cfg = self.model_configs["llava-1.5-7b"]
+        elif "internvl3-8b" in self.model_configs:
+            self.cfg = self.model_configs["internvl3-8b"]
         elif self.model_configs:
             self.cfg = next(iter(self.model_configs.values()))
         else:
