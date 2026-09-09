@@ -11,6 +11,15 @@ models:
     max_new_tokens: 16
     temperature: 0.0
 
+  llava-1.5-7b:
+    hf_id: "models/llava-1.5-7b-hf"
+    family: "llava"
+    torch_dtype: "float16"
+    load_in_4bit: true
+    trust_remote_code: false
+    max_new_tokens: 16
+    temperature: 0.0
+
   llava-onevision-7b:
     hf_id: "lmms-lab/llava-onevision-qwen2-7b-ov"
     family: "llava_onevision"
