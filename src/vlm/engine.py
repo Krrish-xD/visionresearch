@@ -22,14 +22,16 @@ except ImportError:
     LlavaForConditionalGeneration = None
 
 try:
-    from transformers import LlavaNextForConditionalGeneration
+    from transformers import LlavaNextForConditionalGeneration, LlavaNextProcessor
 except ImportError:
     LlavaNextForConditionalGeneration = None
+    LlavaNextProcessor = None
 
 try:
-    from transformers import LlavaOnevisionForConditionalGeneration
+    from transformers import LlavaOnevisionForConditionalGeneration, LlavaOnevisionProcessor
 except ImportError:
     LlavaOnevisionForConditionalGeneration = None
+    LlavaOnevisionProcessor = None
 
 try:
     from transformers import Qwen2_5_VLForConditionalGeneration, Qwen2VLForConditionalGeneration
@@ -51,6 +53,8 @@ def _detect_family(model_id_or_path: str) -> str:
         return "internvl"
     if "qwen" in lower or "qwen2" in lower:
         return "qwen"
+    if "onevision" in lower:
+        return "llava_onevision"
     if "llava" in lower:
         return "llava"
     return "generic"
@@ -206,6 +210,7 @@ class VLMEngine:
             "torch_dtype": torch.bfloat16,
             "device_map": "auto" if self.device == "cuda" else None,
             "trust_remote_code": trust_remote_code,
+            "attn_implementation": "sdpa" if self.device == "cuda" else None,
         }
         if load_in_4bit and self.device == "cuda":
             bnb = self._build_bnb_config(family="qwen")
@@ -231,19 +236,40 @@ class VLMEngine:
     def _load_generic(self, path: str, load_in_4bit: bool, trust_remote_code: bool,
                       family: str):
         """Load LLaVA-family or generic vision-language model."""
-        try:
-            self.processor = AutoProcessor.from_pretrained(
-                path, trust_remote_code=trust_remote_code
-            )
-        except Exception:
-            self.processor = AutoTokenizer.from_pretrained(
-                path, trust_remote_code=trust_remote_code
-            )
+        model_lower = path.lower()
+        self.processor = None
+        if "onevision" in model_lower and LlavaOnevisionProcessor is not None:
+            try:
+                self.processor = LlavaOnevisionProcessor.from_pretrained(
+                    path, trust_remote_code=trust_remote_code
+                )
+            except Exception:
+                pass
+        elif ("next" in model_lower or "v1.6" in model_lower) and LlavaNextProcessor is not None:
+            try:
+                self.processor = LlavaNextProcessor.from_pretrained(
+                    path, trust_remote_code=trust_remote_code
+                )
+            except Exception:
+                pass
+
+        if self.processor is None:
+            try:
+                self.processor = AutoProcessor.from_pretrained(
+                    path, trust_remote_code=trust_remote_code
+                )
+            except Exception:
+                self.processor = AutoTokenizer.from_pretrained(
+                    path, trust_remote_code=trust_remote_code
+                )
+
+        torch_dtype = torch.bfloat16 if "onevision" in model_lower else (torch.float16 if self.device == "cuda" else torch.float32)
 
         kwargs = {
-            "torch_dtype": torch.float16 if self.device == "cuda" else torch.float32,
+            "torch_dtype": torch_dtype,
             "device_map": "auto" if self.device == "cuda" else None,
             "trust_remote_code": trust_remote_code,
+            "attn_implementation": "sdpa" if self.device == "cuda" else None,
         }
         if load_in_4bit and self.device == "cuda":
             bnb = self._build_bnb_config(family=family)
@@ -317,6 +343,43 @@ class VLMEngine:
             return self._generate_generic(pil_image, prompt_text, temperature,
                                           top_p, top_k, max_tokens)
 
+    def generate_batch_with_logprobs(self, pil_images: list, prompt_texts: list,
+                                     temperature: float = 0.0, top_p: float = 1.0,
+                                     top_k: int = 50, max_tokens: int = 16):
+        """Runs batched inference and extracts exact token logprobs for each item in the batch.
+
+        Returns a list of dicts, one per item in the batch:
+          [{"full_text": str, "tokens": list, "outputs": outputs, "prompt_len": int, "generated_ids": tensor, "batch_idx": int}, ...]
+        """
+        if self.model is None:
+            raise RuntimeError("No model is currently loaded.")
+
+        if not prompt_texts:
+            return []
+
+        try:
+            if self.model_family == "internvl":
+                return [
+                    {**self._generate_internvl(img, prompt, max_tokens), "batch_idx": 0}
+                    for img, prompt in zip(pil_images, prompt_texts)
+                ]
+            elif self.model_family == "qwen":
+                return self._generate_qwen_batch(pil_images, prompt_texts, max_tokens)
+            else:
+                return self._generate_generic_batch(pil_images, prompt_texts, temperature,
+                                                   top_p, top_k, max_tokens)
+        except (torch.cuda.OutOfMemoryError, RuntimeError) as err:
+            # If OOM and batch size > 1, dynamically split batch in half to prevent failure
+            if "out of memory" in str(err).lower() and len(prompt_texts) > 1:
+                torch.cuda.empty_cache()
+                mid = len(prompt_texts) // 2
+                res1 = self.generate_batch_with_logprobs(pil_images[:mid], prompt_texts[:mid],
+                                                         temperature, top_p, top_k, max_tokens)
+                res2 = self.generate_batch_with_logprobs(pil_images[mid:], prompt_texts[mid:],
+                                                         temperature, top_p, top_k, max_tokens)
+                return res1 + res2
+            raise
+
     def _generate_internvl(self, pil_image, prompt_text: str, max_tokens: int):
         from src.vlm.internvl_inference import internvl_generate_with_logprobs
         return internvl_generate_with_logprobs(
@@ -342,6 +405,8 @@ class VLMEngine:
     def _generate_generic(self, pil_image, prompt_text: str, temperature: float,
                           top_p: float, top_k: int, max_tokens: int):
         """Standard HuggingFace generate for LLaVA and generic models."""
+        formatted = None
+        is_onevision = "onevision" in (self.current_model_id or "").lower()
         if hasattr(self.processor, "apply_chat_template"):
             messages = [{
                 "role": "user",
@@ -353,30 +418,32 @@ class VLMEngine:
             try:
                 formatted = self.processor.apply_chat_template(
                     messages, tokenize=False, add_generation_prompt=True)
-                if pil_image:
-                    inputs = self.processor(text=[formatted], images=[pil_image],
-                                            padding=True, return_tensors="pt")
-                else:
-                    inputs = self.processor(text=[formatted], padding=True,
-                                            return_tensors="pt")
             except Exception:
+                user_content = f"<image>\n{prompt_text}" if pil_image else prompt_text
+                try:
+                    formatted = self.processor.apply_chat_template(
+                        [{"role": "user", "content": user_content}],
+                        tokenize=False,
+                        add_generation_prompt=True
+                    )
+                except Exception:
+                    pass
+
+        if not formatted:
+            if is_onevision:
+                formatted = f"<|im_start|>user\n<image>\n{prompt_text}<|im_end|>\n<|im_start|>assistant\n" if pil_image else f"<|im_start|>user\n{prompt_text}<|im_end|>\n<|im_start|>assistant\n"
+            else:
                 formatted = (f"USER: <image>\n{prompt_text}\nASSISTANT:"
                              if pil_image else f"USER: {prompt_text}\nASSISTANT:")
-                if pil_image:
-                    inputs = self.processor(text=formatted, images=pil_image,
-                                            return_tensors="pt")
-                else:
-                    inputs = self.processor(text=formatted, return_tensors="pt")
-        else:
-            formatted = (f"USER: <image>\n{prompt_text}\nASSISTANT:"
-                         if pil_image else f"USER: {prompt_text}\nASSISTANT:")
-            if pil_image:
-                inputs = self.processor(text=formatted, images=pil_image,
-                                        return_tensors="pt")
-            else:
-                inputs = self.processor(text=formatted, return_tensors="pt")
 
-        inputs = {k: v.to(self.model.device) for k, v in inputs.items()}
+        if pil_image:
+            inputs = self.processor(text=[formatted], images=[pil_image],
+                                    padding=True, return_tensors="pt")
+        else:
+            inputs = self.processor(text=[formatted], padding=True,
+                                    return_tensors="pt")
+
+        inputs = {k: (v.to(self.model.device) if hasattr(v, "to") else v) for k, v in inputs.items()}
 
         gen_kwargs = {
             "max_new_tokens": max_tokens,
@@ -423,3 +490,171 @@ class VLMEngine:
             "prompt_len":    input_len,
             "generated_ids": outputs.sequences,
         }
+
+    def _generate_qwen_batch(self, pil_images: list, prompt_texts: list, max_tokens: int):
+        from src.vlm.qwen_inference import _resize_to_multiple_of_28
+        messages_list = []
+        resized_images = []
+        for img, prompt in zip(pil_images, prompt_texts):
+            if img is not None:
+                r_img = _resize_to_multiple_of_28(img)
+                resized_images.append(r_img)
+                content = [{"type": "image", "image": r_img}, {"type": "text", "text": prompt}]
+            else:
+                resized_images.append(None)
+                content = [{"type": "text", "text": prompt}]
+            messages_list.append([{"role": "user", "content": content}])
+
+        formatted_texts = []
+        for msgs in messages_list:
+            try:
+                txt = self.processor.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True)
+            except Exception:
+                p_text = msgs[0]["content"][-1]["text"]
+                txt = f"<|im_start|>user\n<|vision_start|><|image_pad|><|vision_end|>{p_text}<|im_end|>\n<|im_start|>assistant\n"
+            formatted_texts.append(txt)
+
+        if hasattr(self.processor, "tokenizer") and self.processor.tokenizer is not None:
+            self.processor.tokenizer.padding_side = "left"
+            if self.processor.tokenizer.pad_token is None:
+                self.processor.tokenizer.pad_token = self.processor.tokenizer.eos_token
+
+        valid_images = [img for img in resized_images if img is not None]
+        proc_kwargs = {"text": formatted_texts, "padding": True, "return_tensors": "pt"}
+        if valid_images:
+            proc_kwargs["images"] = valid_images
+
+        inputs = self.processor(**proc_kwargs)
+        inputs = {k: v.to(self.model.device) for k, v in inputs.items()}
+
+        gen_kwargs = {
+            "max_new_tokens": max_tokens,
+            "return_dict_in_generate": True,
+            "output_scores": True,
+            "do_sample": False,
+        }
+
+        with torch.no_grad():
+            outputs = self.model.generate(**inputs, **gen_kwargs)
+
+        input_len = inputs["input_ids"].shape[1]
+        results = []
+        for b in range(len(prompt_texts)):
+            gen_seq = outputs.sequences[b][input_len:]
+            full_text = self.processor.decode(gen_seq, skip_special_tokens=True).strip()
+            tokens = []
+            for i, tok_tensor in enumerate(gen_seq):
+                tok_id = tok_tensor.item()
+                step_logits = outputs.scores[i][b]
+                step_lprobs = torch.nn.functional.log_softmax(step_logits, dim=-1)
+                tok_logprob = step_lprobs[tok_id].item()
+                if hasattr(self.processor, "tokenizer") and self.processor.tokenizer is not None:
+                    tok_text = self.processor.tokenizer.decode([tok_id])
+                else:
+                    tok_text = str(tok_id)
+                tokens.append({
+                    "token_id": tok_id,
+                    "text": tok_text,
+                    "logprob": tok_logprob,
+                    "prob_percent": math.exp(tok_logprob) * 100.0,
+                })
+            results.append({
+                "full_text": full_text,
+                "tokens": tokens,
+                "outputs": outputs,
+                "prompt_len": input_len,
+                "generated_ids": outputs.sequences,
+                "batch_idx": b,
+            })
+        return results
+
+    def _generate_generic_batch(self, pil_images: list, prompt_texts: list,
+                               temperature: float, top_p: float, top_k: int, max_tokens: int):
+        formatted_prompts = []
+        is_onevision = "onevision" in (self.current_model_id or "").lower()
+        for img, prompt in zip(pil_images, prompt_texts):
+            formatted = None
+            if hasattr(self.processor, "apply_chat_template"):
+                messages = [{
+                    "role": "user",
+                    "content": [
+                        *([{"type": "image"}] if img else []),
+                        {"type": "text", "text": prompt},
+                    ],
+                }]
+                try:
+                    formatted = self.processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+                except Exception:
+                    user_content = f"<image>\n{prompt}" if img else prompt
+                    try:
+                        formatted = self.processor.apply_chat_template(
+                            [{"role": "user", "content": user_content}],
+                            tokenize=False,
+                            add_generation_prompt=True
+                        )
+                    except Exception:
+                        pass
+
+            if not formatted:
+                if is_onevision:
+                    formatted = f"<|im_start|>user\n<image>\n{prompt}<|im_end|>\n<|im_start|>assistant\n" if img else f"<|im_start|>user\n{prompt}<|im_end|>\n<|im_start|>assistant\n"
+                else:
+                    formatted = f"USER: <image>\n{prompt}\nASSISTANT:" if img else f"USER: {prompt}\nASSISTANT:"
+            formatted_prompts.append(formatted)
+
+        if hasattr(self.processor, "tokenizer") and self.processor.tokenizer is not None:
+            self.processor.tokenizer.padding_side = "left"
+            if self.processor.tokenizer.pad_token is None:
+                self.processor.tokenizer.pad_token = self.processor.tokenizer.eos_token
+
+        proc_kwargs = {"text": formatted_prompts, "padding": True, "return_tensors": "pt"}
+        valid_images = [img for img in pil_images if img is not None]
+        if valid_images:
+            proc_kwargs["images"] = valid_images
+
+        inputs = self.processor(**proc_kwargs)
+        inputs = {k: (v.to(self.model.device) if hasattr(v, "to") else v) for k, v in inputs.items()}
+
+        gen_kwargs = {
+            "max_new_tokens": max_tokens,
+            "return_dict_in_generate": True,
+            "output_scores": True,
+        }
+        if temperature > 0.0:
+            gen_kwargs.update({"do_sample": True, "temperature": temperature, "top_p": top_p, "top_k": top_k})
+        else:
+            gen_kwargs["do_sample"] = False
+
+        with torch.no_grad():
+            outputs = self.model.generate(**inputs, **gen_kwargs)
+
+        input_len = inputs["input_ids"].shape[1]
+        results = []
+        for b in range(len(prompt_texts)):
+            gen_seq = outputs.sequences[b][input_len:]
+            full_text = self.processor.decode(gen_seq, skip_special_tokens=True).strip()
+            tokens = []
+            for i, tok_tensor in enumerate(gen_seq):
+                tok_id = tok_tensor.item()
+                step_logits = outputs.scores[i][b]
+                step_lprobs = torch.nn.functional.log_softmax(step_logits, dim=-1)
+                tok_logprob = step_lprobs[tok_id].item()
+                if hasattr(self.processor, "tokenizer") and self.processor.tokenizer is not None:
+                    tok_text = self.processor.tokenizer.decode([tok_id])
+                else:
+                    tok_text = str(tok_id)
+                tokens.append({
+                    "token_id": tok_id,
+                    "text": tok_text,
+                    "logprob": tok_logprob,
+                    "prob_percent": math.exp(tok_logprob) * 100.0,
+                })
+            results.append({
+                "full_text": full_text,
+                "tokens": tokens,
+                "outputs": outputs,
+                "prompt_len": input_len,
+                "generated_ids": outputs.sequences,
+                "batch_idx": b,
+            })
+        return results

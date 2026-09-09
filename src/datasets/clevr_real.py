@@ -5,14 +5,15 @@ the unified ``data/processed/clevr.jsonl`` ITEM_SCHEMA format used by the
 evaluation pipeline, the same way ``src/datasets/mmvp.py`` standardizes MMVP.
 
 Unlike ``src/datasets/clevr.py`` (which only synthesizes placeholder items),
-this loader reads real ground-truth scene graphs and question answers so that
+this loader reads real ground-truth scene graphs and question programs so that
 ``gold_facts`` encode the true label and ``image_path`` points to real CLEVR
-renderings.
-
+renderings. CLEVR v1.0 has no ``answer_type``/``question_type`` fields, so the
+answer type is derived from the functional program's terminal function
+(``count``/``exist``/``query_*``/``equal_*``/``less_than``/``greater_than``).
 The fact *value* is the dataset's ground-truth answer (the authoritative label
 for this real image); predicate/subject/attribute_type are parsed from the
-question text so the downstream Z3 verifier can detect contradictions between
-VLM claims and ground truth.
+question/program so the Z3 verifier can detect contradictions between VLM
+claims and ground truth.
 """
 
 import os
@@ -28,7 +29,22 @@ CLEVR_SHAPES = ["cube", "sphere", "cylinder"]
 CLEVR_MATERIALS = ["rubber", "metal"]
 CLEVR_SIZES = ["small", "large"]
 
-REL_WORDS = ["left", "right", "above", "below", "in front of", "behind"]
+# terminal function -> (schema_answer_type, category)
+TERM_TO_TYPE = {
+    "count": ("count", "counting"),
+    "exist": ("yes_no", "existence"),
+    "query_color": ("attribute", "attribute"),
+    "query_shape": ("attribute", "attribute"),
+    "query_material": ("attribute", "attribute"),
+    "query_size": ("attribute", "attribute"),
+    "equal_int": ("yes_no", "counting"),
+    "less_than": ("yes_no", "counting"),
+    "greater_than": ("yes_no", "counting"),
+    "equal_color": ("yes_no", "attribute"),
+    "equal_shape": ("yes_no", "attribute"),
+    "equal_material": ("yes_no", "attribute"),
+    "equal_size": ("yes_no", "attribute"),
+}
 
 
 def _normalize(text: str) -> str:
@@ -79,25 +95,30 @@ def _build_subject(colors, shapes, materials, sizes) -> str:
     return "_".join(parts) if parts else "target_object"
 
 
-def _derive_fact(question: str, answer: str, question_type: str,
-                 answer_type: str) -> Tuple[str, str, Dict[str, Any]]:
-    """Derive (schema_answer_type, category, gold_fact) for a CLEVR question."""
+def _terminal_function(program: List[Dict[str, Any]]) -> str:
+    if not program:
+        return "scene"
+    return program[-1].get("function", "scene")
+
+
+def _has_spatial_relation(program: List[Dict[str, Any]]) -> bool:
+    return any(p.get("function") == "relate" for p in program)
+
+
+def _derive_fact(question: str, program: List[Dict[str, Any]],
+                 answer: str) -> Tuple[str, str, Dict[str, Any]]:
+    """Derive (schema_answer_type, category, gold_fact) from the question program."""
     q = _normalize(question)
     colors = _find_in(q, CLEVR_COLORS)
     shapes = _find_in(q, CLEVR_SHAPES)
     materials = _find_in(q, CLEVR_MATERIALS)
     sizes = _find_in(q, CLEVR_SIZES)
-    at = _normalize(answer_type)
-    qt = _normalize(question_type)
     ans = _normalize(answer)
+    term = _terminal_function(program)
 
-    if at == "count" or q.startswith("how many"):
-        schema_at, category = "count", "counting"
-    elif at == "yes/no":
-        schema_at = "yes_no"
-        category = "existence" if "exist" in qt else "spatial_relation"
-    else:
-        schema_at, category = "attribute", "attribute"
+    schema_at, category = TERM_TO_TYPE.get(term, ("attribute", "attribute"))
+    if term == "exist" and _has_spatial_relation(program):
+        category = "spatial_relation"
 
     subject = _build_subject(colors, shapes, materials, sizes)
 
@@ -110,20 +131,11 @@ def _derive_fact(question: str, answer: str, question_type: str,
         fact = {"predicate": "count", "subject": subject, "value": value}
     elif schema_at == "yes_no":
         fact = {"predicate": "exists", "subject": subject, "value": ans == "yes"}
-    else:
-        attr_type = "property"
-        for cand in ("color", "shape", "material", "size"):
-            if f"query_{cand}" in qt or f"what {cand}" in q or f"how {cand}" in q:
-                attr_type = cand
-                break
+    else:  # attribute
+        attr_type = term.replace("query_", "", 1) if term.startswith("query_") else "property"
         fact = {"predicate": "attribute", "subject": subject,
                 "attribute_type": attr_type, "value": ans}
     return schema_at, category, fact
-
-
-def _image_path(split: str, image_index: int) -> str:
-    fname = f"CLEVR_{split}_{int(image_index):06d}.png"
-    return f"data/raw/clevr/CLEVR_v1.0/images/{split}/{fname}"
 
 
 def prepare_clevr_dataset(
@@ -138,7 +150,7 @@ def prepare_clevr_dataset(
     Reads questions + scene graphs, derives one symbolic gold fact per question
     (value = ground-truth answer), and writes the standardized JSONL consumed by
     the VLM evaluation pipeline. Output is limited to `limit` items sampled
-    deterministically, stratified by category.
+    deterministically, stratified by category. Test split is skipped (no answers).
     """
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     random.seed(seed)
@@ -147,31 +159,33 @@ def prepare_clevr_dataset(
     counter = 0
     for split in splits:
         q_path = os.path.join(clevr_root, "questions", f"CLEVR_{split}_questions.json")
-        s_path = os.path.join(clevr_root, "scenes", f"CLEVR_{split}_scenes.json")
-        if not (os.path.exists(q_path) and os.path.exists(s_path)):
+        if not os.path.exists(q_path):
             continue
-        scenes = _load_scenes(s_path)
         questions = _load_questions(q_path)
         for q in questions:
             answer = _normalize(q.get("answer", ""))
-            qtext = _normalize(q.get("question", ""))
-            at = _normalize(q.get("answer_type", ""))
-            qt = _normalize(q.get("question_type", ""))
+            if not answer:
+                continue  # skip test/hidden-answer questions
+            qtext = q.get("question", "")
+            program = q.get("program", [])
             img_idx = int(q.get("image_index", q.get("imageId", -1)))
+            img_fn = q.get("image_filename", f"CLEVR_{split}_{img_idx:06d}.png")
+            img_split = q.get("split", split)
+            rec_split = img_split
 
-            schema_at, category, fact = _derive_fact(qtext, answer, qt, at)
+            schema_at, category, fact = _derive_fact(qtext, program, answer)
             counter += 1
             raw_items.append({
-                "item_id": f"clevr_{split}_{img_idx:06d}_{counter}",
+                "item_id": f"clevr_{rec_split}_{img_idx:06d}_{counter}",
                 "dataset": "clevr",
-                "image_path": _image_path(split, img_idx),
+                "image_path": f"data/raw/clevr/CLEVR_v1.0/images/{rec_split}/{img_fn}",
                 "question": qtext,
                 "options": "",
                 "answer_type": schema_at,
                 "gold_answer": answer,
                 "gold_facts": [fact],
                 "category": category,
-                "split": split,
+                "split": rec_split,
             })
 
     by_cat: Dict[str, List[Dict[str, Any]]] = {}

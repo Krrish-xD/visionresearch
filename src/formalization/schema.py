@@ -63,7 +63,17 @@ PREDICTION_SCHEMA: Dict[str, Any] = {
             "items": {"type": "number"}
         },
         "is_correct": {"type": "boolean"},
-        "parse_status": {"type": "string", "enum": ["success", "failed", "unsupported"]}
+        "parse_status": {"type": "string", "enum": ["success", "failed", "unsupported"]},
+        "category": {"type": "string"},
+        "answer_type": {"type": "string"},
+        "question": {"type": "string"},
+        "image_path": {"type": "string"},
+        "gold_answer": {"type": "string"},
+        "gold_facts": {"type": "array"},
+        "error_type": {"type": "string"},
+        "error_detail": {"type": ["string", "null"]},
+        "confidence_bin": {"type": "string"},
+        "tokens": {"type": "array"}
     }
 }
 

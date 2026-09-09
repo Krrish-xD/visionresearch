@@ -1,17 +1,28 @@
-from fastapi import APIRouter, File, UploadFile, Form, HTTPException
-from PIL import Image
+import asyncio
 import io
 import typing
+
+from fastapi import APIRouter, File, UploadFile, Form, HTTPException
+from fastapi.concurrency import run_in_threadpool
+from PIL import Image
 
 from src.vlm.server import vlm_engine
 from src.api.schemas import TokenLogprob, GenerationResponse, ModelInfo, ModelLoadRequest, ModelStatusResponse
 
 router = APIRouter(prefix="/api")
 
+# Serializes only model loading so concurrent /generate requests for a freshly
+# switched model do not each trigger an expensive reload. Generation itself runs
+# concurrently: the heavy blocking call is offloaded to a threadpool so the
+# asyncio event loop stays free to serve parallel requests on one loaded model.
+_model_load_lock = asyncio.Lock()
+
+
 @router.get("/models", response_model=typing.List[ModelInfo])
 async def list_models():
     """Returns available local models purely from the weights directory."""
     return vlm_engine.list_available_models()
+
 
 @router.get("/model/status", response_model=ModelStatusResponse)
 async def get_model_status():
@@ -21,18 +32,21 @@ async def get_model_status():
         is_loaded=vlm_engine.model is not None
     )
 
+
 @router.post("/model/load")
 async def load_model(req: ModelLoadRequest):
     """Explicitly loads a model into memory."""
-    # Resolve ID to path
     models = vlm_engine.list_available_models()
     model_path = next((m["path"] for m in models if m["id"] == req.model_id), req.model_id)
-    
-    try:
-        vlm_engine.load_model(model_path)
-        return {"status": "success", "message": f"Loaded {req.model_id}"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to load model: {str(e)}")
+
+    async with _model_load_lock:
+        try:
+            await run_in_threadpool(vlm_engine.load_model, model_path)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to load model: {str(e)}")
+
+    return {"status": "success", "message": f"Loaded {req.model_id}"}
+
 
 @router.post("/generate", response_model=GenerationResponse)
 async def generate_logprobs(
@@ -50,23 +64,25 @@ async def generate_logprobs(
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid image format: {str(e)}")
 
-    # Resolve ID to path
+    # Resolve ID to path; fall back to treating model_id as a filesystem path
     models = vlm_engine.list_available_models()
     model_path = next((m["path"] for m in models if m["id"] == model_id), model_id)
-    
-    try:
-        vlm_engine.load_model(model_path)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to load model: {str(e)}")
+
+    async with _model_load_lock:
+        try:
+            await run_in_threadpool(vlm_engine.load_model, model_path)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to load model: {str(e)}")
 
     try:
-        result = vlm_engine.generate_with_logprobs(
-            pil_image, 
-            prompt, 
-            temperature=temperature, 
-            top_p=top_p, 
-            top_k=top_k, 
-            max_tokens=max_tokens
+        result = await run_in_threadpool(
+            vlm_engine.generate_with_logprobs,
+            pil_image,
+            prompt,
+            temperature=temperature,
+            top_p=top_p,
+            top_k=top_k,
+            max_tokens=max_tokens,
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Inference failed: {str(e)}")
