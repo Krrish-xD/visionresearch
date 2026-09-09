@@ -215,10 +215,9 @@ def internvl_generate_with_logprobs(
         "use_cache": True,
     }
     # Set eos if we have it
-    try:
-        gen_kwargs["eos_token_id"] = eos_token_id
-    except NameError:
-        pass
+    eos_id = locals().get("eos_token_id", getattr(tokenizer, "eos_token_id", None))
+    if eos_id is not None:
+        gen_kwargs["eos_token_id"] = eos_id
 
     with torch.no_grad():
         outputs = model.language_model.generate(**gen_kwargs)

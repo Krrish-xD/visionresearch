@@ -22,6 +22,11 @@ def generate_gqa_subset(
     attributes = ["wooden", "metallic", "white", "black", "large", "small", "clean", "open"]
     relations = ["on_top_of", "to_the_left_of", "to_the_right_of", "behind", "in_front_of", "next_to"]
 
+    images_dir = "data/raw/gqa/images"
+    real_images = []
+    if os.path.isdir(images_dir):
+        real_images = sorted([f for f in os.listdir(images_dir) if f.lower().endswith((".jpg", ".png", ".jpeg"))])
+
     items = []
     for i in range(1, subset_size + 1):
         item_id = f"gqa_{i:04d}"
@@ -59,10 +64,15 @@ def generate_gqa_subset(
             gold_facts = [{"predicate": "count", "subject": obj_a, "value": count_a}]
             ans_type = "count"
 
+        if real_images:
+            img_rel_path = f"data/raw/gqa/images/{real_images[(i - 1) % len(real_images)]}"
+        else:
+            img_rel_path = f"data/raw/gqa/images/{i:04d}.png"
+
         item = {
             "item_id": item_id,
             "dataset": "gqa",
-            "image_path": f"data/raw/gqa/images/{i:04d}.png",
+            "image_path": img_rel_path,
             "question": question,
             "options": "",
             "answer_type": ans_type,

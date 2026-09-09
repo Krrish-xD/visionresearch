@@ -3,39 +3,43 @@
 
 models:
   internvl3-8b:
-    hf_id: "models/internvl3-8b"
+    hf_id: "weights/internvl3-8b"
     family: "internvl"
     torch_dtype: "bfloat16"
     load_in_4bit: true
     trust_remote_code: true
-    max_new_tokens: 16
+    attn_implementation: "sdpa"
+    max_new_tokens: 4
     temperature: 0.0
 
   llava-onevision-7b:
-    hf_id: "lmms-lab/llava-onevision-qwen2-7b-ov"
+    hf_id: "weights/llava-onevision-7b"
     family: "llava_onevision"
     torch_dtype: "bfloat16"
     load_in_4bit: true
     trust_remote_code: false
-    max_new_tokens: 16
+    attn_implementation: "sdpa"
+    max_new_tokens: 4
     temperature: 0.0
 
   llava-next-7b:
-    hf_id: "llava-hf/llava-v1.6-mistral-7b-hf"
+    hf_id: "weights/llava-next-7b"
     family: "llava_next"
     torch_dtype: "float16"
     load_in_4bit: true
     trust_remote_code: false
-    max_new_tokens: 16
+    attn_implementation: "sdpa"
+    max_new_tokens: 4
     temperature: 0.0
 
   qwen2.5-vl-7b:
-    hf_id: "models/qwen2.5-vl-7b-instruct"
+    hf_id: "weights/qwen2.5-vl-7b"
     family: "qwen"
     torch_dtype: "bfloat16"
     load_in_4bit: true
     trust_remote_code: true
-    max_new_tokens: 16
+    attn_implementation: "sdpa"
+    max_new_tokens: 4
     temperature: 0.0
 
 prompts:
