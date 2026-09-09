@@ -9,7 +9,7 @@ Supports three model families with dedicated handlers:
 import os
 import math
 import torch
-from transformers import AutoProcessor, AutoTokenizer, AutoModelForCausalLM
+from transformers import AutoProcessor, AutoTokenizer, AutoModelForCausalLM, AutoModel
 
 try:
     from transformers import AutoModelForVision2Seq
@@ -20,6 +20,16 @@ try:
     from transformers import LlavaForConditionalGeneration
 except ImportError:
     LlavaForConditionalGeneration = None
+
+try:
+    from transformers import LlavaNextForConditionalGeneration
+except ImportError:
+    LlavaNextForConditionalGeneration = None
+
+try:
+    from transformers import LlavaOnevisionForConditionalGeneration
+except ImportError:
+    LlavaOnevisionForConditionalGeneration = None
 
 try:
     from transformers import Qwen2_5_VLForConditionalGeneration, Qwen2VLForConditionalGeneration
@@ -105,7 +115,6 @@ class VLMEngine:
         """Loads a model dynamically, unloading the previous one if necessary."""
         if self.current_model_id == model_id_or_path and self.model is not None:
             return  # Already loaded
-
         print(f"[Engine] Loading model: {model_id_or_path}")
         self.unload_model()
 
@@ -222,9 +231,14 @@ class VLMEngine:
     def _load_generic(self, path: str, load_in_4bit: bool, trust_remote_code: bool,
                       family: str):
         """Load LLaVA-family or generic vision-language model."""
-        self.processor = AutoProcessor.from_pretrained(
-            path, trust_remote_code=trust_remote_code
-        )
+        try:
+            self.processor = AutoProcessor.from_pretrained(
+                path, trust_remote_code=trust_remote_code
+            )
+        except Exception:
+            self.processor = AutoTokenizer.from_pretrained(
+                path, trust_remote_code=trust_remote_code
+            )
 
         kwargs = {
             "torch_dtype": torch.float16 if self.device == "cuda" else torch.float32,
@@ -236,7 +250,23 @@ class VLMEngine:
             if bnb:
                 kwargs["quantization_config"] = bnb
 
-        # Try LLaVA class first
+        # Try specific LLaVA classes first
+        model_lower = path.lower()
+        if "onevision" in model_lower and LlavaOnevisionForConditionalGeneration is not None:
+            try:
+                self.model = LlavaOnevisionForConditionalGeneration.from_pretrained(path, **kwargs)
+                return
+            except Exception:
+                pass
+
+        if ("next" in model_lower or "v1.6" in model_lower) and LlavaNextForConditionalGeneration is not None:
+            try:
+                self.model = LlavaNextForConditionalGeneration.from_pretrained(path, **kwargs)
+                return
+            except Exception:
+                pass
+
+        # Try LLaVA class
         if family == "llava" and LlavaForConditionalGeneration is not None:
             try:
                 self.model = LlavaForConditionalGeneration.from_pretrained(path, **kwargs)
@@ -252,7 +282,17 @@ class VLMEngine:
             except Exception:
                 pass
 
-        self.model = AutoModelForCausalLM.from_pretrained(path, **kwargs)
+        # Try AutoModelForCausalLM
+        try:
+            self.model = AutoModelForCausalLM.from_pretrained(path, **kwargs)
+            return
+        except Exception:
+            pass
+
+        # Fallback to AutoModel
+        self.model = AutoModel.from_pretrained(path, **kwargs)
+        if hasattr(self.model, "img_context_token_id") and getattr(self.model, "img_context_token_id", None) is None:
+            self.model.img_context_token_id = 151667
 
     # ------------------------------------------------------------------
     # Generation — routes to family handler

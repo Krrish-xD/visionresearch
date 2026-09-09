@@ -1,0 +1,42 @@
+{
+  "internvl3-8b": {
+    "hf_id": "OpenGVLab/InternVL3-8B",
+    "family": "internvl",
+    "parameters": "8B",
+    "vram_4bit_gb": 5.5,
+    "vram_16bit_gb": 16.0,
+    "recommended_quantization": "4bit",
+    "description": "Latest InternVL3 flagship model optimized for visual grounding, reasoning, and multi-turn VQA.",
+    "command": "huggingface-cli download OpenGVLab/InternVL3-8B --local-dir weights/internvl3-8b"
+  },
+  "llava-onevision-7b": {
+    "hf_id": "lmms-lab/llava-onevision-qwen2-7b-ov",
+    "family": "llava_onevision",
+    "parameters": "7B",
+    "vram_4bit_gb": 5.0,
+    "vram_16bit_gb": 14.5,
+    "recommended_quantization": "4bit",
+    "description": "Latest LLaVA-OneVision model (SigLIP + Qwen2) for high-resolution single/multi-image grounding.",
+    "command": "huggingface-cli download lmms-lab/llava-onevision-qwen2-7b-ov --local-dir weights/llava-onevision-7b"
+  },
+  "llava-next-7b": {
+    "hf_id": "llava-hf/llava-v1.6-mistral-7b-hf",
+    "family": "llava_next",
+    "parameters": "7B",
+    "vram_4bit_gb": 5.0,
+    "vram_16bit_gb": 14.5,
+    "recommended_quantization": "4bit",
+    "description": "LLaVA-NeXT (v1.6) with AnyRes dynamic resolution for fine-grained visual details.",
+    "command": "huggingface-cli download llava-hf/llava-v1.6-mistral-7b-hf --local-dir weights/llava-next-7b"
+  },
+  "qwen2.5-vl-7b": {
+    "hf_id": "Qwen/Qwen2.5-VL-7B-Instruct",
+    "family": "qwen",
+    "parameters": "7B",
+    "vram_4bit_gb": 5.5,
+    "vram_16bit_gb": 15.0,
+    "recommended_quantization": "4bit",
+    "description": "Latest Qwen2.5-VL 7B instruction-tuned vision-language model with dynamic resolution.",
+    "command": "huggingface-cli download Qwen/Qwen2.5-VL-7B-Instruct --local-dir weights/qwen2.5-vl-7b"
+  }
+}
