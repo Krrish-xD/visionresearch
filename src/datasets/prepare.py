@@ -11,6 +11,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 from src.datasets.mmvp import prepare_mmvp_dataset
 from src.datasets.clevr import generate_clevr_subset
 from src.datasets.gqa import generate_gqa_subset
+from src.datasets.clevr_real import prepare_clevr_dataset
 from src.formalization.validators import validate_item
 
 
@@ -37,7 +38,10 @@ def prepare_all(config_path: str = "configs/experiment.yaml"):
     if ds_cfg.get("clevr", {}).get("enabled", True):
         clevr_path = ds_cfg.get("clevr", {}).get("processed_path", "data/processed/clevr.jsonl")
         size = ds_cfg.get("clevr", {}).get("subset_size", 1000)
-        items = generate_clevr_subset(output_path=clevr_path, subset_size=size)
+        if os.path.isdir(os.path.join("data", "raw", "clevr", "CLEVR_v1.0")):
+            items = prepare_clevr_dataset(output_path=clevr_path, limit=size)
+        else:
+            items = generate_clevr_subset(output_path=clevr_path, subset_size=size)
         for it in items:
             valid, msg = validate_item(it)
             if valid:
