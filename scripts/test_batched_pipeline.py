@@ -55,6 +55,8 @@ def _resolve_and_load_image(item: dict):
     img_path = item.get("image_path")
     if not img_path:
         return None
+    if not os.path.isabs(img_path):
+        img_path = os.path.join(ROOT_DIR, img_path)
     if not os.path.exists(img_path):
         stem = os.path.splitext(os.path.basename(img_path))[0]
         dir_name = os.path.dirname(img_path)
@@ -610,9 +612,9 @@ def run_pipeline_test(
         idx_cursor = 0
 
         os.makedirs(output_dir, exist_ok=True)
-        with ThreadPoolExecutor(max_workers=4) as executor, open(pred_file, "a", encoding="utf-8") as f_out:
+        with ThreadPoolExecutor(max_workers=2) as executor, open(pred_file, "a", encoding="utf-8") as f_out:
             def _load_slice(slice_items):
-                return list(executor.map(_resolve_and_load_image, slice_items))
+                return [_resolve_and_load_image(it) for it in slice_items]
 
             initial_step = min(current_bs, len(remaining_items) - idx_cursor)
             pref_future = executor.submit(_load_slice, remaining_items[idx_cursor:idx_cursor + initial_step])
