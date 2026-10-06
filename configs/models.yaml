@@ -13,28 +13,8 @@ models:
     temperature: 0.0
 
   llava-1.5-7b:
-    hf_id: "weights/llava-1.5-7b"
+    hf_id: "llava-hf/llava-1.5-7b-hf"
     family: "llava"
-    torch_dtype: "float16"
-    load_in_4bit: true
-    trust_remote_code: false
-    attn_implementation: "sdpa"
-    max_new_tokens: 4
-    temperature: 0.0
-
-  llava-onevision-7b:
-    hf_id: "weights/llava-onevision-7b"
-    family: "llava_onevision"
-    torch_dtype: "bfloat16"
-    load_in_4bit: true
-    trust_remote_code: false
-    attn_implementation: "sdpa"
-    max_new_tokens: 4
-    temperature: 0.0
-
-  llava-next-7b:
-    hf_id: "weights/llava-next-7b"
-    family: "llava_next"
     torch_dtype: "float16"
     load_in_4bit: true
     trust_remote_code: false

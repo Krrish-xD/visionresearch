@@ -1,0 +1,46 @@
+{
+  "leaderboard": [
+    {
+      "model": "internvl3-8b",
+      "accuracy_pct": 30.65,
+      "ece": 0.3563,
+      "brier_score": 0.3191,
+      "mean_confidence": 0.6628,
+      "throughput_img_s": 0.54,
+      "categories": {
+        "binary_existence": 50.53,
+        "comparative": 21.53,
+        "object_attribute": 0.93,
+        "spatial_relation": 49.6
+      }
+    },
+    {
+      "model": "llava-1.5-7b",
+      "accuracy_pct": 26.68,
+      "ece": 0.3993,
+      "brier_score": 0.387,
+      "mean_confidence": 0.6563,
+      "throughput_img_s": 2.62,
+      "categories": {
+        "binary_existence": 50.47,
+        "comparative": 4.53,
+        "object_attribute": 2.0,
+        "spatial_relation": 49.73
+      }
+    },
+    {
+      "model": "qwen2.5-vl-7b",
+      "accuracy_pct": 26.15,
+      "ece": 0.4472,
+      "brier_score": 0.4391,
+      "mean_confidence": 0.6961,
+      "throughput_img_s": 2.5,
+      "categories": {
+        "binary_existence": 50.13,
+        "comparative": 3.6,
+        "object_attribute": 0.8,
+        "spatial_relation": 50.07
+      }
+    }
+  ]
+}

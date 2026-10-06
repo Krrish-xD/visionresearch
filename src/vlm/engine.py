@@ -158,6 +158,10 @@ class VLMEngine:
             }
             if family == "qwen":
                 kwargs["llm_int8_skip_modules"] = ["visual"]
+            elif family == "internvl":
+                kwargs["llm_int8_skip_modules"] = ["vision_model"]
+            elif family == "llava":
+                kwargs["llm_int8_skip_modules"] = ["vision_tower"]
             return BitsAndBytesConfig(**kwargs)
         except ImportError:
             return None
@@ -165,11 +169,14 @@ class VLMEngine:
     def _load_internvl(self, path: str, load_in_4bit: bool, trust_remote_code: bool):
         """Load InternVL3 model + tokenizer (not AutoProcessor)."""
         # InternVL3 uses its own tokenizer, not AutoProcessor
-        self.processor = AutoTokenizer.from_pretrained(
-            path,
-            trust_remote_code=trust_remote_code,
-            use_fast=False,
-        )
+        tok_kwargs = {
+            "trust_remote_code": trust_remote_code,
+            "use_fast": False,
+        }
+        try:
+            self.processor = AutoTokenizer.from_pretrained(path, fix_mistral_regex=True, **tok_kwargs)
+        except TypeError:
+            self.processor = AutoTokenizer.from_pretrained(path, **tok_kwargs)
 
         kwargs = {
             "torch_dtype": torch.bfloat16,
@@ -319,6 +326,11 @@ class VLMEngine:
         self.model = AutoModel.from_pretrained(path, **kwargs)
         if hasattr(self.model, "img_context_token_id") and getattr(self.model, "img_context_token_id", None) is None:
             self.model.img_context_token_id = 151667
+        if not hasattr(self.model, "generate"):
+            raise RuntimeError(
+                f"Model loaded from '{path}' as {type(self.model).__name__} does not support .generate(). "
+                f"Ensure the checkpoint is compatible with LlavaForConditionalGeneration or AutoModelForVision2Seq."
+            )
 
     # ------------------------------------------------------------------
     # Generation — routes to family handler

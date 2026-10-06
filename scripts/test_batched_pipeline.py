@@ -47,7 +47,7 @@ from src.vlm.confidence import extract_token_confidence
 from src.formalization.parser import parse_vlm_answer_to_claim, normalize_text
 from src.calibration.metrics import compute_ece, compute_brier_score
 
-DEFAULT_MODELS = ["qwen2.5-vl-7b", "internvl3-8b", "llava-onevision-7b", "llava-next-7b"]
+DEFAULT_MODELS = ["qwen2.5-vl-7b", "internvl3-8b", "llava-1.5-7b"]
 
 
 def _resolve_and_load_image(item: dict):

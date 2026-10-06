@@ -1,0 +1,126 @@
+{
+  "model": "internvl3-8b",
+  "dataset": "gqa_curated_6000",
+  "timestamp": "2026-09-11T16:20:14.287630",
+  "total_items": 6000,
+  "correct_items": 1839,
+  "overall_accuracy_pct": 30.65,
+  "overall_ece": 0.3563,
+  "overall_brier_score": 0.3191,
+  "mean_confidence": 0.6628,
+  "overconfidence_gap": 0.3563,
+  "category_breakdown": {
+    "binary_existence": {
+      "total_items": 1500,
+      "correct_items": 758,
+      "accuracy_pct": 50.53,
+      "mean_confidence": 0.8556,
+      "ece": 0.3502,
+      "error_breakdown": {
+        "missed_detection": 627,
+        "none": 758,
+        "hallucination": 115
+      }
+    },
+    "comparative": {
+      "total_items": 1500,
+      "correct_items": 323,
+      "accuracy_pct": 21.53,
+      "mean_confidence": 0.4986,
+      "ece": 0.2836,
+      "error_breakdown": {
+        "none": 323,
+        "count_discrepancy": 1171,
+        "parser_failure": 6
+      }
+    },
+    "object_attribute": {
+      "total_items": 1500,
+      "correct_items": 14,
+      "accuracy_pct": 0.93,
+      "mean_confidence": 0.4648,
+      "ece": 0.4555,
+      "error_breakdown": {
+        "attribute_mismatch": 1486,
+        "none": 14
+      }
+    },
+    "spatial_relation": {
+      "total_items": 1500,
+      "correct_items": 744,
+      "accuracy_pct": 49.6,
+      "mean_confidence": 0.8323,
+      "ece": 0.3363,
+      "error_breakdown": {
+        "missed_detection": 419,
+        "none": 744,
+        "hallucination": 337
+      }
+    }
+  },
+  "error_distribution": {
+    "missed_detection": 1046,
+    "none": 1839,
+    "hallucination": 452,
+    "attribute_mismatch": 1486,
+    "count_discrepancy": 1171,
+    "parser_failure": 6
+  },
+  "confidence_bins": {
+    "bin_edges": [
+      0.0,
+      0.1,
+      0.2,
+      0.30000000000000004,
+      0.4,
+      0.5,
+      0.6000000000000001,
+      0.7000000000000001,
+      0.8,
+      0.9,
+      1.0
+    ],
+    "bin_accs": [
+      0.0,
+      0.0,
+      0.09358288770053476,
+      0.14695340501792115,
+      0.14615384615384616,
+      0.09971509971509972,
+      0.12660550458715597,
+      0.4747583243823845,
+      0.45382059800664454,
+      0.49417852522639066
+    ],
+    "bin_confs": [
+      0.09565758624228397,
+      0.17789305530175156,
+      0.2614834473802916,
+      0.3511622099650283,
+      0.4483785689044472,
+      0.5450223196554507,
+      0.6419786963365708,
+      0.7573144482112871,
+      0.8451792478200749,
+      0.9388794104817553
+    ],
+    "bin_counts": [
+      19,
+      73,
+      374,
+      558,
+      520,
+      702,
+      545,
+      931,
+      1505,
+      773
+    ],
+    "num_bins": 10
+  },
+  "throughput": {
+    "avg_img_per_sec": 0.54,
+    "cold_load_time_sec": 24.53,
+    "active_inference_sec": 6450.66
+  }
+}

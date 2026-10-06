@@ -19,6 +19,7 @@ bitsandbytes>=0.43.0
 peft>=0.11.0
 einops>=0.8.0
 qwen-vl-utils
+timm
 
 # Symbolic Solver and Calibration Framework
 z3-solver>=4.12.0

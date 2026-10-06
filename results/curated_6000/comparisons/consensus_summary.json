@@ -1,0 +1,12 @@
+{
+  "compared_models": [
+    "qwen2.5-vl-7b",
+    "internvl3-8b",
+    "llava-1.5-7b"
+  ],
+  "total_common_items": 6000,
+  "agreed_items": 1972,
+  "disagreed_items": 4028,
+  "consensus_rate_pct": 32.87,
+  "disagreements_file": "results/curated_6000\\comparisons\\disagreements.jsonl"
+}
