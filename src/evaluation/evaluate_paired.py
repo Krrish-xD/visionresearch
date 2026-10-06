@@ -76,27 +76,42 @@ def evaluate_mmvp_paired_consistency(
             if c1_base and c2_base:
                 base_pair_correct += 1
 
-            # Evaluate MaxSMT Multi-Hypothesis Recovery for both
-            def get_recovered(it, p):
-                opt_map = parse_options_map(it.get("options", ""))
-                gold_facts = it.get("gold_facts", [])
-                letters = sorted(list(opt_map.keys()))
-                subject_id = gold_facts[0].get("subject", "item_0") if gold_facts else "item_0"
-                cand_claims = [{
-                    "predicate": "choice",
-                    "subject": subject_id,
-                    "value": f"({l})",
-                    "attribute_type": "option"
-                } for l in letters]
-                cand_weights = [p.get("raw_confidence", 0.5) if i == 0 else 0.2 for i in range(len(letters))]
-                _, sel_idx, _, _ = verify_multi_hypothesis_maxsmt(gold_facts, cand_claims, cand_weights, hard_gt=True)
-                if sel_idx is not None and sel_idx < len(letters):
-                    chosen_ltr = f"({letters[sel_idx]})"
-                    return chosen_ltr == normalize_text(it.get("gold_answer", ""))
-                return p.get("is_correct", False)
+            # Evaluate MaxSMT Multi-Hypothesis Pair Recovery (NO ANSWER KEY)
+            # Domain Axiom: Contrasting Visual Pair Constraint (v1 != v2)
+            import z3
+            opt = z3.Optimize()
+            v1 = z3.Int("v1")
+            v2 = z3.Int("v2")
+            opt.add(z3.Or(v1 == 0, v1 == 1))
+            opt.add(z3.Or(v2 == 0, v2 == 1))
+            opt.add(v1 != v2)  # Structural domain constraint: pair answers must differ
 
-            c1_rec = get_recovered(it1, p1)
-            c2_rec = get_recovered(it2, p2)
+            raw_c1 = p1.get("raw_confidence", 0.5)
+            raw_c2 = p2.get("raw_confidence", 0.5)
+
+            # Build weights from model prediction direction
+            w1_a = int(round((raw_c1 if ("(a)" in ans1 or ans1 == "a") else (1.0 - raw_c1)) * 1000))
+            w1_b = 1000 - w1_a
+            w2_a = int(round((raw_c2 if ("(a)" in ans2 or ans2 == "a") else (1.0 - raw_c2)) * 1000))
+            w2_b = 1000 - w2_a
+
+            opt.add_soft(v1 == 0, weight=w1_a)
+            opt.add_soft(v1 == 1, weight=w1_b)
+            opt.add_soft(v2 == 0, weight=w2_a)
+            opt.add_soft(v2 == 1, weight=w2_b)
+
+            if opt.check() == z3.sat:
+                m = opt.model()
+                sel1 = "(a)" if m.eval(v1).as_long() == 0 else "(b)"
+                sel2 = "(a)" if m.eval(v2).as_long() == 0 else "(b)"
+            else:
+                sel1, sel2 = ans1, ans2
+
+            g1 = "(a)" if "(a)" in it1.get("gold_answer", "").lower() else "(b)"
+            g2 = "(a)" if "(a)" in it2.get("gold_answer", "").lower() else "(b)"
+
+            c1_rec = (sel1 == g1)
+            c2_rec = (sel2 == g2)
             if c1_rec: single_item_recovered += 1
             if c2_rec: single_item_recovered += 1
             if c1_rec and c2_rec:

@@ -193,9 +193,17 @@ def run_advanced_evaluation(
                         l_vec = [float(np.log(p_val / (1.0 - p_val))), 0.0]
                     cal_logits.append(l_vec)
 
+            # Check whether logit vectors have a uniform dimension across all samples
+            cal_has_uniform = (
+                len(cal_logits) > 0
+                and all(isinstance(x, (list, np.ndarray)) for x in cal_logits)
+                and len(set(len(x) for x in cal_logits)) == 1
+            )
+            temp_input_cal = cal_logits if cal_has_uniform else cal_confs
+
             # Fit Temperature and Isotonic
             temp_cal = TemperatureScaling()
-            temp_cal.fit(cal_logits, cal_labels)
+            temp_cal.fit(temp_input_cal, cal_labels)
             iso_cal = IsotonicCalibrator()
             iso_cal.fit(cal_confs, cal_labels)
 
@@ -213,34 +221,99 @@ def run_advanced_evaluation(
                     l_vec = [float(np.log(p_val / (1.0 - p_val))), 0.0]
                 eval_logits.append(l_vec)
 
-            eval_temp_confs = temp_cal.transform(eval_logits)
+            eval_has_uniform = (
+                cal_has_uniform
+                and len(eval_logits) > 0
+                and len(set(len(x) for x in eval_logits)) == 1
+                and len(eval_logits[0]) == len(cal_logits[0])
+            )
+            temp_input_eval = eval_logits if eval_has_uniform else eval_raw_confs
+            eval_temp_confs = temp_cal.transform(temp_input_eval)
             eval_iso_confs = iso_cal.transform(eval_raw_confs)
 
-            # --- PART 1: Multi-Hypothesis Selection Evaluation ---
-            base_correct_cnt = 0
-            recovered_correct_cnt = 0
-            total_top1_errors = 0
-            total_recovered = 0
-            total_solve_time = 0.0
+            # --- PART 1: Multi-Hypothesis Selection Evaluation (NO ANSWER KEY) ---
+            # On MMVP, we use the authentic paired contrasting constraint (v1 != v2)
+            # without supplying any benchmark answer key to Z3.
+            if dataset_name == "mmvp":
+                pairs = [(eval_items[i], eval_items[i+1]) for i in range(0, len(eval_items), 2) if i+1 < len(eval_items)]
+                base_correct_cnt = 0
+                recovered_correct_cnt = 0
+                total_top1_errors = 0
+                total_recovered = 0
+                total_solve_time = 0.0
 
-            for idx, (it, p) in enumerate(zip(eval_items, eval_preds)):
-                iso_c = float(eval_iso_confs[idx])
-                res = evaluate_multi_hypothesis_for_item(it, p, iso_c, hard_gt=True)
-                
-                if res["base_is_correct"]:
-                    base_correct_cnt += 1
-                else:
-                    total_top1_errors += 1
+                import z3, time
+                for it1, it2 in pairs:
+                    p1 = preds_by_id[it1["item_id"]]
+                    p2 = preds_by_id[it2["item_id"]]
+                    
+                    c1_b = p1.get("is_correct", False)
+                    c2_b = p2.get("is_correct", False)
+                    if c1_b: base_correct_cnt += 1
+                    else: total_top1_errors += 1
+                    if c2_b: base_correct_cnt += 1
+                    else: total_top1_errors += 1
 
-                if res["selected_is_correct"]:
-                    recovered_correct_cnt += 1
+                    a1 = p1.get("normalized_answer", "")
+                    a2 = p2.get("normalized_answer", "")
+                    raw_c1 = p1.get("raw_confidence", 0.5)
+                    raw_c2 = p2.get("raw_confidence", 0.5)
 
-                if res["recovered"]:
-                    total_recovered += 1
+                    t0 = time.perf_counter()
+                    opt = z3.Optimize()
+                    v1 = z3.Int("v1")
+                    v2 = z3.Int("v2")
+                    opt.add(z3.Or(v1 == 0, v1 == 1))
+                    opt.add(z3.Or(v2 == 0, v2 == 1))
+                    opt.add(v1 != v2)  # Domain symmetry constraint: NO ANSWER KEY
 
-                total_solve_time += res["solve_time_ms"]
+                    w1_a = int(round((raw_c1 if ("(a)" in a1 or a1 == "a") else (1.0 - raw_c1)) * 1000))
+                    w1_b = 1000 - w1_a
+                    w2_a = int(round((raw_c2 if ("(a)" in a2 or a2 == "a") else (1.0 - raw_c2)) * 1000))
+                    w2_b = 1000 - w2_a
 
-            n_eval = len(eval_items)
+                    opt.add_soft(v1 == 0, weight=w1_a)
+                    opt.add_soft(v1 == 1, weight=w1_b)
+                    opt.add_soft(v2 == 0, weight=w2_a)
+                    opt.add_soft(v2 == 1, weight=w2_b)
+
+                    if opt.check() == z3.sat:
+                        m = opt.model()
+                        sel1 = "(a)" if m.eval(v1).as_long() == 0 else "(b)"
+                        sel2 = "(a)" if m.eval(v2).as_long() == 0 else "(b)"
+                    else:
+                        sel1, sel2 = a1, a2
+                    total_solve_time += (time.perf_counter() - t0) * 1000.0
+
+                    g1 = "(a)" if "(a)" in it1.get("gold_answer", "").lower() else "(b)"
+                    g2 = "(a)" if "(a)" in it2.get("gold_answer", "").lower() else "(b)"
+
+                    c1_rec = (sel1 == g1)
+                    c2_rec = (sel2 == g2)
+                    if c1_rec: recovered_correct_cnt += 1
+                    if c2_rec: recovered_correct_cnt += 1
+
+                    if (not c1_b) and c1_rec: total_recovered += 1
+                    if (not c2_b) and c2_rec: total_recovered += 1
+
+                n_eval = len(pairs) * 2
+            else:
+                base_correct_cnt = 0
+                recovered_correct_cnt = 0
+                total_top1_errors = 0
+                total_recovered = 0
+                total_solve_time = 0.0
+
+                for idx, (it, p) in enumerate(zip(eval_items, eval_preds)):
+                    iso_c = float(eval_iso_confs[idx])
+                    res = evaluate_multi_hypothesis_for_item(it, p, iso_c, hard_gt=False)
+                    if res["base_is_correct"]: base_correct_cnt += 1
+                    else: total_top1_errors += 1
+                    if res["selected_is_correct"]: recovered_correct_cnt += 1
+                    if res["recovered"]: total_recovered += 1
+                    total_solve_time += res["solve_time_ms"]
+                n_eval = len(eval_items)
+
             base_acc = (base_correct_cnt / n_eval) if n_eval > 0 else 0.0
             recovered_acc = (recovered_correct_cnt / n_eval) if n_eval > 0 else 0.0
             recovery_rate = (total_recovered / total_top1_errors) if total_top1_errors > 0 else 0.0
@@ -267,49 +340,48 @@ def run_advanced_evaluation(
                     "recovery_rate": recovery_rate
                 }
 
-            # --- PART 2: Conformal Selective Abstention Evaluation ---
-            # Dummy contradiction flags for selective evaluation
-            # (flagged = not is_correct)
-            flags = ~eval_labels
+            # --- PART 2: Conformal Selective Abstention Evaluation (Real Error Rates) ---
+            # Evaluate empirical selective prediction without synthetic oracle shortcuts
+            def compute_selective_stats(confs, target_cov=0.80):
+                if len(confs) == 0 or len(eval_labels) == 0:
+                    return 0.0, 0.0, 0.0
+                thresh = np.percentile(confs, (1.0 - target_cov) * 100)
+                retained = confs >= thresh
+                cov = float(np.mean(retained))
+                acc = float(np.mean(eval_labels[retained])) if np.sum(retained) > 0 else 0.0
+                err = 1.0 - acc
+                return cov, acc, err
 
-            df_raw = SelectiveAbstentionController.compute_tradeoff_curve(eval_raw_confs, eval_labels, flags)
-            df_temp = SelectiveAbstentionController.compute_tradeoff_curve(eval_temp_confs, eval_labels, flags)
-            df_iso = SelectiveAbstentionController.compute_tradeoff_curve(eval_iso_confs, eval_labels, flags)
+            def compute_cov_at_prec(confs, min_prec=0.90):
+                if len(confs) == 0 or len(eval_labels) == 0:
+                    return 0.0
+                sorted_idx = np.argsort(confs)[::-1]
+                best_cov = 0.0
+                for k in range(1, len(confs) + 1):
+                    prec = np.mean(eval_labels[sorted_idx[:k]])
+                    if prec >= min_prec:
+                        best_cov = k / len(confs)
+                return best_cov
 
-            if dataset_name == "mmvp" and model_key == "qwen2.5-vl-7b":
-                mmvp_tradeoffs["Raw"] = df_raw
-                mmvp_tradeoffs["Temperature"] = df_temp
-                mmvp_tradeoffs["Isotonic"] = df_iso
+            cov90_raw = compute_cov_at_prec(eval_raw_confs, 0.90)
+            cov90_iso = compute_cov_at_prec(eval_iso_confs, 0.90)
+            cov80_raw = compute_cov_at_prec(eval_raw_confs, 0.80)
+            cov80_iso = compute_cov_at_prec(eval_iso_confs, 0.80)
 
-            # Extract metrics at target coverage operating points
-            def get_metrics_at_cov(df: pd.DataFrame, target_cov: float = 0.80):
-                df_sub = df[df["coverage"] >= target_cov]
-                if not df_sub.empty:
-                    row = df_sub.iloc[-1]
-                    return row["accuracy"], row["sfar"], row["coverage"]
-                return df.iloc[0]["accuracy"], df.iloc[0]["sfar"], df.iloc[0]["coverage"]
-
-            def get_cov_at_precision(df: pd.DataFrame, min_prec: float = 0.95):
-                df_sub = df[df["accuracy"] >= min_prec]
-                if not df_sub.empty:
-                    return df_sub.iloc[0]["coverage"]
-                return 0.0
-
-            cov95_raw = get_cov_at_precision(df_raw, 0.95)
-            cov95_iso = get_cov_at_precision(df_iso, 0.95)
-
-            acc80_raw, sfar80_raw, _ = get_metrics_at_cov(df_raw, 0.80)
-            acc80_iso, sfar80_iso, _ = get_metrics_at_cov(df_iso, 0.80)
+            _, acc80_raw, err80_raw = compute_selective_stats(eval_raw_confs, 0.80)
+            _, acc80_iso, err80_iso = compute_selective_stats(eval_iso_confs, 0.80)
 
             table7_rows.append({
                 "Model": model_key,
                 "Dataset": dataset_name.upper(),
-                "Coverage @ 95% Precision (Raw)": f"{cov95_raw * 100:.1f}%",
-                "Coverage @ 95% Precision (Isotonic)": f"{cov95_iso * 100:.1f}%",
+                "Coverage @ 80% Precision (Raw)": f"{cov80_raw * 100:.1f}%",
+                "Coverage @ 80% Precision (Isotonic)": f"{cov80_iso * 100:.1f}%",
+                "Coverage @ 90% Precision (Raw)": f"{cov90_raw * 100:.1f}%",
+                "Coverage @ 90% Precision (Isotonic)": f"{cov90_iso * 100:.1f}%",
                 "Accuracy @ 80% Coverage (Raw)": f"{acc80_raw * 100:.2f}%",
                 "Accuracy @ 80% Coverage (Isotonic)": f"{acc80_iso * 100:.2f}%",
-                "SFAR @ 80% Coverage (Raw)": f"{sfar80_raw:.4f}",
-                "SFAR @ 80% Coverage (Isotonic)": f"{sfar80_iso:.4f}",
+                "Error Rate @ 80% Coverage (Raw)": f"{err80_raw * 100:.2f}%",
+                "Error Rate @ 80% Coverage (Isotonic)": f"{err80_iso * 100:.2f}%",
             })
 
             print(f"Done: {model_key} on {dataset_name} -> Base Acc: {base_acc*100:.1f}%, Recovered: {recovered_acc*100:.1f}%, Gain: +{(recovered_acc-base_acc)*100:.1f}%")
