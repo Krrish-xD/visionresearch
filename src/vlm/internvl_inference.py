@@ -23,7 +23,8 @@ from typing import Optional, Tuple, List, Dict, Any
 INTERNVL_IMAGENET_MEAN = (0.485, 0.456, 0.406)
 INTERNVL_IMAGENET_STD  = (0.229, 0.224, 0.225)
 INTERNVL_IMAGE_SIZE    = 448   # force_image_size from config
-INTERNVL_MAX_TILES     = 6     # max dynamic tiles (keeps VRAM manageable)
+INTERNVL_MAX_TILES     = 1     # Single tile: CLEVR images are clean 480x320 synthetic renders;
+                               # tiling adds 6x compute with no accuracy gain on this dataset.
 
 
 def _build_transform(image_size: int = INTERNVL_IMAGE_SIZE):

@@ -9,7 +9,7 @@ models:
     load_in_4bit: true
     trust_remote_code: true
     attn_implementation: "sdpa"
-    max_new_tokens: 4
+    max_new_tokens: 8
     temperature: 0.0
 
   llava-1.5-7b:
@@ -19,7 +19,7 @@ models:
     load_in_4bit: true
     trust_remote_code: false
     attn_implementation: "sdpa"
-    max_new_tokens: 4
+    max_new_tokens: 8
     temperature: 0.0
 
   qwen2.5-vl-7b:
@@ -29,7 +29,7 @@ models:
     load_in_4bit: true
     trust_remote_code: true
     attn_implementation: "sdpa"
-    max_new_tokens: 4
+    max_new_tokens: 8
     temperature: 0.0
 
 prompts:

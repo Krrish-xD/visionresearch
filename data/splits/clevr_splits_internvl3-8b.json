@@ -1,6 +1,6 @@
 {
-  "model": "shared (llava/internvl)",
-  "dataset_file": "data/processed/clevr.jsonl",
+  "model": "internvl3-8b",
+  "dataset_file": "results/raw_predictions\\internvl3-8b_clevr.jsonl",
   "seed": 42,
   "cal_ratio": 0.4,
   "eval_ratio": 0.6,

@@ -38,7 +38,8 @@ def run_experiment_pipeline(
     model_key: str = "llava-1.5-7b",
     config_path: str = "configs/experiment.yaml",
     pilot: bool = False,
-    mock: bool = False
+    mock: bool = False,
+    splits_override: str = None
 ) -> Dict[str, Any]:
     """Execute complete end-to-end evaluation pipeline."""
     with open(config_path, "r", encoding="utf-8") as f:
@@ -56,11 +57,12 @@ def run_experiment_pipeline(
         prepare_all(config_path)
 
     # 2. Ensure splits exist
-    splits_file = f"data/splits/{dataset_name}_splits.json"
+    splits_file = splits_override if splits_override else f"data/splits/{dataset_name}_splits.json"
     if not os.path.exists(splits_file):
         print(f"Splits {splits_file} not found. Creating deterministic splits...")
         make_all_splits(config_path)
 
+    print(f"Using splits file: {splits_file}")
     with open(splits_file, "r", encoding="utf-8") as f:
         split_data = json.load(f)
 
@@ -74,6 +76,16 @@ def run_experiment_pipeline(
             if line.strip():
                 it = json.loads(line)
                 items_by_id[it["item_id"]] = it
+
+    # Also load synthetic items if present (supports Qwen or synthetic benchmarks without overwriting real data)
+    synth_file = "data/processed/clevr_synthetic.jsonl"
+    if os.path.exists(synth_file):
+        with open(synth_file, "r", encoding="utf-8") as f:
+            for line in f:
+                if line.strip():
+                    it = json.loads(line)
+                    if it["item_id"] not in items_by_id:
+                        items_by_id[it["item_id"]] = it
 
     # If pilot mode, subset evaluation items to 50 items
     if pilot:
@@ -109,16 +121,25 @@ def run_experiment_pipeline(
                 logits_vec = [float(np.log(p_val / (1.0 - p_val))), 0.0]
             cal_logits.append(logits_vec)
 
+    # Check whether logit vectors have a uniform dimension across all samples
+    cal_has_uniform = (
+        len(cal_logits) > 0
+        and all(isinstance(x, (list, np.ndarray)) for x in cal_logits)
+        and len(set(len(x) for x in cal_logits)) == 1
+    )
+    temp_input_cal = cal_logits if cal_has_uniform else cal_confs
+    conf_input_cal = cal_logits if cal_has_uniform else cal_confs
+
     print(f"Fitting calibrators on {len(cal_confs)} calibration items...")
     temp_calibrator = TemperatureScaling()
-    temp_calibrator.fit(cal_logits, cal_labels)
+    temp_calibrator.fit(temp_input_cal, cal_labels)
     print(f"Fitted Temperature: T = {temp_calibrator.temperature:.4f}")
 
     iso_calibrator = IsotonicCalibrator()
     iso_calibrator.fit(cal_confs, cal_labels)
 
     conf_calibrator = ConformalRiskWeighting(alpha=0.10)
-    conf_calibrator.fit(cal_logits, cal_labels)
+    conf_calibrator.fit(conf_input_cal, cal_labels)
     print(f"Fitted Conformal Threshold: q_hat = {conf_calibrator.q_hat:.4f}")
 
     # 5. Evaluation Split: Transform confidences and run MaxSMT solver across all 6 conditions
@@ -139,11 +160,20 @@ def run_experiment_pipeline(
             l_vec = [float(np.log(p_val / (1.0 - p_val))), 0.0]
         eval_logits.append(l_vec)
 
-    # Compute calibrated confidences
+    eval_has_uniform = (
+        cal_has_uniform
+        and len(eval_logits) > 0
+        and len(set(len(x) for x in eval_logits)) == 1
+        and len(eval_logits[0]) == len(cal_logits[0])
+    )
     raw_confs_arr = np.array([preds_by_id[it["item_id"]]["raw_confidence"] for it in eval_items_ordered])
-    temp_confs_arr = temp_calibrator.transform(eval_logits)
+    temp_input_eval = eval_logits if eval_has_uniform else raw_confs_arr
+    conf_input_eval = eval_logits if eval_has_uniform else raw_confs_arr
+
+    # Compute calibrated confidences
+    temp_confs_arr = temp_calibrator.transform(temp_input_eval)
     iso_confs_arr = iso_calibrator.transform(raw_confs_arr)
-    conf_weights_arr = conf_calibrator.transform(eval_logits)
+    conf_weights_arr = conf_calibrator.transform(conf_input_eval)
 
     eval_labels = [preds_by_id[it["item_id"]]["is_correct"] for it in eval_items_ordered]
 
@@ -357,6 +387,7 @@ if __name__ == "__main__":
     parser.add_argument("--config", default="configs/experiment.yaml", help="Config file")
     parser.add_argument("--pilot", action="store_true", help="Run in pilot mode (50 items)")
     parser.add_argument("--mock", action="store_true", help="Run with simulated predictions for fast validation")
+    parser.add_argument("--splits", default=None, help="Override splits file path (for per-model splits)")
     args = parser.parse_args()
 
     run_experiment_pipeline(
@@ -364,5 +395,6 @@ if __name__ == "__main__":
         model_key=args.model,
         config_path=args.config,
         pilot=args.pilot,
-        mock=args.mock
+        mock=args.mock,
+        splits_override=args.splits
     )
